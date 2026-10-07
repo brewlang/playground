@@ -302,6 +302,16 @@ form input {
   min-width: 0;
 }
 
+.units label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .muted {
   color: var(--muted);
 }

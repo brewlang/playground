@@ -8,6 +8,7 @@ Try [Brewlang](../brewlang) in the browser: write a `.brew` recipe and see its d
 - **Summary:** brewer, dose, water, ratio, temperature, grind and target.
 - **Format** rewrites the recipe in its canonical form.
 - **Scale** by dose or by water, then replace the recipe with the result.
+- **Units:** convert the dose (g, oz), the water (g and oz, or ml and floz: never a weight into a volume) and the temperatures (°C, °F), then replace the recipe with the result.
 - **Copy link** puts the recipe in the URL, to share it. The last recipe is also kept in the browser.
 - **Examples** come from `../brewlang/examples`.
 

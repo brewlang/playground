@@ -1,7 +1,7 @@
 import { lintGutter } from "@codemirror/lint";
 import { EditorView, basicSetup } from "codemirror";
-import type { Diagnostic, Recipe, ScaleResult } from "brewlang";
-import { check, format, scaleToDose, scaleToWater } from "brewlang";
+import type { ConvertResult, ConvertUnits, Diagnostic, DoseUnit, Recipe, ScaleResult, TempUnit, WaterUnit } from "brewlang";
+import { check, convert, format, scaleToDose, scaleToWater } from "brewlang";
 import { brewAutocomplete } from "./complete";
 import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
@@ -201,6 +201,68 @@ function renderScale(recipe: Recipe, ok: boolean) {
   output.hidden = use.hidden = false;
 }
 
+let converted: ConvertResult | undefined;
+let wantedUnits: ConvertUnits = {}; // What the selects ask for, until the recipe is replaced
+
+/// The units a recipe is written in; a measure it does not have is absent
+function recipeUnits(recipe: Recipe): ConvertUnits {
+  const { header, steps } = recipe;
+  const units: ConvertUnits = {};
+  if (!header) return units;
+
+  units.dose = header.dose.unit;
+  const water = header.water ?? steps.find((step) => step.kind === "Pour")?.water;
+  if (water) units.water = water.unit;
+  const temp = header.temp ?? steps.find((step) => step.kind === "TempChange")?.temp;
+  if (temp) units.temp = temp.unit;
+  return units;
+}
+
+/// Brewlang never turns weights into volumes: only the water units of the same kind are offered
+const WATER_KIND: Record<string, string> = { g: "weight", oz: "weight", ml: "volume", floz: "volume" };
+
+function renderUnits(recipe: Recipe, ok: boolean) {
+  const message = $("units-message");
+  const output = $<HTMLPreElement>("converted");
+  const use = $<HTMLButtonElement>("units-use");
+  const current = recipeUnits(recipe);
+
+  const show = (text: string, isError = false) => {
+    message.textContent = text;
+    message.className = isError ? "error-text" : "muted";
+    output.hidden = use.hidden = true;
+    converted = undefined;
+  };
+
+  // Each select shows the wanted unit, or the recipe's own; disabled when the recipe has no such measure
+  const selects = { dose: "unit-dose", water: "unit-water", temp: "unit-temp" } as const;
+  for (const [measure, id] of Object.entries(selects) as [keyof ConvertUnits, string][]) {
+    const select = $<HTMLSelectElement>(id);
+    const unit = current[measure];
+    select.disabled = !ok || unit === undefined;
+    if (unit !== undefined) select.value = wantedUnits[measure] ?? unit;
+  }
+  for (const option of $<HTMLSelectElement>("unit-water").options) {
+    option.disabled = current.water !== undefined && WATER_KIND[option.value] !== WATER_KIND[current.water];
+  }
+
+  if (!ok) return show("Fix the errors first: only a valid recipe can be converted.", true);
+
+  const changes = (Object.keys(wantedUnits) as (keyof ConvertUnits)[]).filter(
+    (measure) => current[measure] !== undefined && wantedUnits[measure] !== current[measure],
+  );
+  if (changes.length === 0) return show("Pick other units to convert the recipe.");
+
+  converted = convert(recipe, wantedUnits);
+  const error = converted.diagnostics.find((d) => d.severity === "error");
+  if (error) return show(error.message, true);
+
+  message.textContent = "Amounts are rounded the way a scale shows them; times stay as written.";
+  message.className = "muted";
+  output.textContent = format(converted.recipe);
+  output.hidden = use.hidden = false;
+}
+
 function refresh() {
   const text = source();
   storage.set(text);
@@ -211,6 +273,7 @@ function refresh() {
   renderSummary(recipe, ok);
   renderDiagnostics(diagnostics);
   renderScale(recipe, ok);
+  renderUnits(recipe, ok);
   $<HTMLButtonElement>("format").disabled = !ok;
 }
 
@@ -223,6 +286,7 @@ for (const name of Object.keys(EXAMPLES).sort()) {
 }
 examples.addEventListener("change", () => {
   const example = EXAMPLES[examples.value];
+  wantedUnits = {}; // A new recipe starts in its own units
   if (example !== undefined) replace(example);
   examples.value = "";
 });
@@ -253,6 +317,21 @@ $("scale-by").addEventListener("change", refresh);
 $("scale-use").addEventListener("click", () => {
   if (scaled) replace(format(scaled.recipe));
   $<HTMLInputElement>("scale-to").value = "";
+  refresh();
+});
+
+$("units").addEventListener("submit", (event) => event.preventDefault());
+$("units").addEventListener("change", () => {
+  wantedUnits = {
+    dose: $<HTMLSelectElement>("unit-dose").value as DoseUnit,
+    water: $<HTMLSelectElement>("unit-water").value as WaterUnit,
+    temp: $<HTMLSelectElement>("unit-temp").value as TempUnit,
+  };
+  refresh();
+});
+$("units-use").addEventListener("click", () => {
+  if (converted) replace(format(converted.recipe));
+  wantedUnits = {};
   refresh();
 });
 
