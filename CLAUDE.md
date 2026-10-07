@@ -19,6 +19,10 @@ There are no tests here: the language behavior is tested in `../brewlang`.
 - The examples are not part of the package: `src/main.ts` reads `../../brewlang/examples/*.brew` with `import.meta.glob` (`?raw`, eager). `server.fs.allow: [".."]` in `vite.config.ts` lets the dev server reach them.
 - Need something from the language (a type, a helper)? Export it from `../brewlang/src/index.ts` rather than reimplementing it here. Example: `Token` and `TokenKind` were exported for the highlighter.
 
+## Deployment
+
+`.github/workflows/deploy.yml` builds `brewlang` then the playground side by side, as locally, and publishes `dist/` on GitHub Pages at `/playground/` (hence `base` in `vite.config.ts`, for builds only).
+
 ## Architecture
 
 - `src/highlight.ts` — a `ViewPlugin` that runs brewlang's `lex()` on every change and marks each token with a `tok-*` CSS class. There is no separate grammar: the colors follow the lexer.

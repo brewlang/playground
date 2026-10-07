@@ -23,3 +23,7 @@ npm run build      # typecheck, then a static site in dist/
 ```
 
 Rebuild brewlang after changing it: the playground reads its `dist/`.
+
+## Deployment
+
+Every push to `master` publishes the site on GitHub Pages, at https://brewlang.github.io/playground/ (`.github/workflows/deploy.yml`). The workflow checks out `brewlang/brewlang` next to the playground, as in development.
