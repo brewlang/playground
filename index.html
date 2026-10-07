@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brewlang Playground</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Brewlang <span>playground</span></h1>
+      <div class="actions">
+        <select id="examples" aria-label="Load an example">
+          <option value="">Load an example…</option>
+        </select>
+        <button id="format" type="button">Format</button>
+        <button id="share" type="button">Copy link</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="editor" aria-label="Recipe"></section>
+
+      <aside>
+        <section>
+          <h2>Recipe</h2>
+          <dl id="summary"></dl>
+        </section>
+
+        <section>
+          <h2>Diagnostics <span id="count"></span></h2>
+          <ul id="diagnostics"></ul>
+        </section>
+
+        <section>
+          <h2>Scale</h2>
+          <form id="scale">
+            <select id="scale-by" aria-label="Scale by">
+              <option value="dose">Dose</option>
+              <option value="water">Water</option>
+            </select>
+            <input id="scale-to" placeholder="25g" aria-label="New amount" autocomplete="off" />
+          </form>
+          <p id="scale-message" class="muted">Give a new dose or total water, like 25g.</p>
+          <pre id="scaled" hidden></pre>
+          <button id="scale-use" type="button" hidden>Replace the recipe</button>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

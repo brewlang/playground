@@ -1,0 +1,26 @@
+{
+  "name": "brewlang-playground",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Try Brewlang in the browser: live diagnostics, formatting and scaling",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "brewlang": "file:../brewlang",
+    "codemirror": "^6.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3"
+  }
+}
