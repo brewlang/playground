@@ -2,14 +2,14 @@
 
 Try [Brewlang](../brewlang) in the browser: write a `.brew` recipe and see its diagnostics as you type, format it, and scale it to a new dose or total water.
 
-- **Live checks:** every error, warning and suggestion from `check`, underlined in the editor and listed on the side. Click one to jump to it.
+- **Live checks:** every error, warning and suggestion from `check`, underlined in the editor and listed under it. Click one to jump to it.
 - **Completion** for brewers (`@`), actions allowed with the brewer (`/`), grind sizes, pour qualifiers and units (type `94c` for `°C`). Ctrl+Space opens it anywhere.
 - **Highlighting** from the brewlang lexer itself, so it never drifts from the language.
-- **Summary:** brewer, dose, water, ratio, temperature, grind and target.
-- **Format** rewrites the recipe in its canonical form.
-- **Scale** by dose or by water, then replace the recipe with the result.
-- **Units:** convert the dose (g, oz), the water (g and oz, or ml and floz: never a weight into a volume) and the temperatures (°C, °F), then replace the recipe with the result.
-- **Copy link** puts the recipe in the URL, to share it. The last recipe is also kept in the browser.
+- **Recipe card:** the recipe as a reader follows it, with its dose, water, temperature, ratio, preparation and timed steps.
+- **Dose, scale and units** (g or oz, °C or °F) change only what the card shows: the source keeps the author's amounts and units.
+- **Share:** a link that carries the recipe itself, or a 1080 × 1350 image of the card.
+- **Copy prompt for your AI:** asks an assistant to write a recipe in Brewlang, pointing it to [`llms.txt`](public/llms.txt).
+- **Light and dark themes**, and a layout with tabs on phones.
 - **Examples** come from `../brewlang/examples`.
 
 ## Development

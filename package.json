@@ -12,12 +12,14 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@brewlang/render": "file:../brewlang/packages/render",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/lint": "^6.9.7",
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.13",
-    "brewlang": "file:../brewlang",
-    "codemirror": "^6.0.2"
+    "brewlang": "file:../brewlang/packages/brewlang",
+    "codemirror": "^6.0.2",
+    "html-to-image": "^1.11.13"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

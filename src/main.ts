@@ -1,53 +1,49 @@
-import { lintGutter } from "@codemirror/lint";
 import { EditorView, basicSetup } from "codemirror";
-import type { ConvertResult, ConvertUnits, Diagnostic, DoseUnit, Recipe, ScaleResult, TempUnit, WaterUnit } from "brewlang";
-import { check, convert, format, scaleToDose, scaleToWater } from "brewlang";
+import type { Diagnostic, Recipe } from "brewlang";
+import { check, toJson } from "brewlang";
+import type { RenderResult } from "@brewlang/render";
+import { brewerKind, render, toHtml } from "@brewlang/render";
+import "@brewlang/render/brew.css";
 import { brewAutocomplete } from "./complete";
 import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
+import { brewMarks } from "./marks";
+import { decode, downloadPng, shareUrl } from "./share";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
   Object.entries(
     import.meta.glob<string>("../../brewlang/examples/*.brew", { query: "?raw", import: "default", eager: true }),
-  ).map(([path, source]) => [path.split("/").pop()!.replace(/\.brew$/, ""), source]),
+  ).map(([path, source]) => [path.split("/").pop()!, source]),
 );
-
-const STORAGE_KEY = "brewlang-playground:source";
-const DEFAULT = EXAMPLES["chemex-hoffmann"] ?? "@V60 15g 250g 94°C\n\n0:00 50g bloom\n0:45 250g\n";
+const DEFAULT_FILE = "chemex-hoffmann.brew";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 // Storage can be missing or blocked (private windows): the playground works without it
 const storage = {
-  get: () => {
+  get: (key: string) => {
     try {
-      return localStorage.getItem(STORAGE_KEY);
+      return localStorage.getItem(`brewlang-playground:${key}`);
     } catch {
       return null;
     }
   },
-  set: (value: string) => {
+  set: (key: string, value: string) => {
     try {
-      localStorage.setItem(STORAGE_KEY, value);
+      localStorage.setItem(`brewlang-playground:${key}`, value);
     } catch {}
   },
 };
 
-/// A shared link carries the recipe in its hash, as base64url UTF-8
-const encode = (source: string) =>
-  btoa(String.fromCharCode(...new TextEncoder().encode(source)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-const decode = (hash: string): string | null => {
-  try {
-    const base64 = hash.replace(/-/g, "+").replace(/_/g, "/");
-    return new TextDecoder().decode(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)));
-  } catch {
-    return null;
-  }
+/// What the reader chose; the source itself never changes with them
+const state = {
+  file: "recipe.brew",
+  factor: 1,
+  weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
+  temp: undefined as "°C" | "°F" | undefined,
+  doseText: undefined as string | undefined, // The dose being typed, kept as is until it changes
+  menu: undefined as "examples" | "share" | undefined,
 };
 
 const fromHash = () => {
@@ -55,16 +51,25 @@ const fromHash = () => {
   return match?.[1] ? decode(match[1]) : null;
 };
 
+let initial = fromHash();
+if (initial === null) {
+  initial = storage.get("source");
+  state.file = storage.get("file") ?? state.file;
+}
+if (initial === null) {
+  initial = EXAMPLES[DEFAULT_FILE] ?? "@V60 15g 250g 94°C\n\n0:00 50g bloom\n0:45 250g\n";
+  state.file = DEFAULT_FILE;
+}
+
 const view = new EditorView({
-  doc: fromHash() ?? storage.get() ?? DEFAULT,
+  doc: initial,
   parent: $("editor"),
   extensions: [
     basicSetup,
     brewHighlight,
     brewAutocomplete,
     brewLint,
-    lintGutter(),
-    EditorView.lineWrapping,
+    brewMarks,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) refresh();
     }),
@@ -74,265 +79,355 @@ const view = new EditorView({
 const source = () => view.state.doc.toString();
 const replace = (text: string) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
 
-/// Water on the scale at the end: the header total, or where the pours end
-function totalWater(recipe: Recipe): { value: number; unit: string } | undefined {
-  if (recipe.header?.water) return { value: recipe.header.water.amount.value, unit: recipe.header.water.unit };
+// Toast
 
-  let total: { value: number; unit: string } | undefined;
-  for (const step of recipe.steps) {
-    if (step.kind !== "Pour") continue;
-    const value = step.water.amount.value;
-    total = { value: step.mode === "add" ? (total?.value ?? 0) + value : value, unit: step.water.unit };
-  }
-  return total;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+function toast(text: string) {
+  const el = $("toast");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 3200);
 }
 
-const quantity = ({ value, max }: { value: number; max?: number }, unit: string) =>
-  `${value}${max === undefined ? "" : `-${max}`}${unit}`;
+// Tabs, on narrow screens: the code or the recipe
 
-function renderSummary(recipe: Recipe, ok: boolean) {
-  const summary = $("summary");
-  const { header } = recipe;
-  if (!header) {
-    summary.innerHTML = `<dt>Brewer</dt><dd class="muted">Start with a header, like @V60 15g 250g 94°C</dd>`;
-    return;
-  }
+function showTab(tab: "code" | "recipe") {
+  $("editor").closest(".panes")!.setAttribute("data-tab", tab);
+  $("tab-code").classList.toggle("on", tab === "code");
+  $("tab-recipe").classList.toggle("on", tab === "recipe");
+}
+$("tab-code").addEventListener("click", () => showTab("code"));
+$("tab-recipe").addEventListener("click", () => showTab("recipe"));
 
-  const rows: [string, string][] = [
-    ["Brewer", `@${header.brewer}`],
-    ["Dose", quantity(header.dose.amount, header.dose.unit)],
-  ];
-
-  const water = totalWater(recipe);
-  if (water) rows.push(["Water", `${water.value}${water.unit}`]);
-
-  // No mass to volume conversion: a ratio only between the same units
-  if (ok && water && water.unit === header.dose.unit && header.dose.amount.max === undefined) {
-    rows.push(["Ratio", `1:${Number((water.value / header.dose.amount.value).toFixed(1))}`]);
-  }
-  if (header.temp) rows.push(["Temperature", quantity(header.temp.amount, header.temp.unit)]);
-
-  const grind = recipe.steps.find((step) => step.kind === "Grind");
-  if (grind) rows.push(["Grind", grind.size]);
-
-  const target = recipe.steps.find((step) => step.kind === "Target");
-  if (target) {
-    const s = target.time.seconds;
-    rows.push(["Target", `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`]);
-  }
-
-  summary.replaceChildren(
-    ...rows.flatMap(([term, value]) => {
-      const dt = document.createElement("dt");
-      const dd = document.createElement("dd");
-      dt.textContent = term;
-      dd.textContent = value;
-      return [dt, dd];
-    }),
-  );
+/// Select the word a diagnostic points at
+function jumpTo(d: Diagnostic) {
+  showTab("code");
+  const { from, to } = range(view.state.doc, d);
+  view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+  view.focus();
 }
 
-function renderDiagnostics(diagnostics: Diagnostic[]) {
+// Problems
+
+const SEVERITY_LABELS = { error: "Error", warning: "Warning", suggestion: "Suggestion" };
+const SEVERITY_RANK = { error: 0, warning: 1, suggestion: 2 };
+
+/// Split a message into what is wrong and what to do: 'The scale is already at 150g: pour higher' -> two lines
+function splitMessage(message: string): [string, string] {
+  const match = /^(.+?)(?:: |\. )(?=[A-Za-z'])(.+)$/.exec(message);
+  if (!match) return [message, ""];
+  const [, what, fix] = match as unknown as [string, string, string];
+  return [what.endsWith("?") ? what : `${what}.`, fix.charAt(0).toUpperCase() + fix.slice(1)];
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
+
+function renderProblems(diagnostics: Diagnostic[]) {
+  const counts = { error: 0, warning: 0, suggestion: 0 };
+  for (const d of diagnostics) counts[d.severity]++;
+
+  const parts = [];
+  if (counts.error) parts.push(plural(counts.error, "error"));
+  if (counts.warning) parts.push(plural(counts.warning, "warning"));
+  if (counts.suggestion) parts.push(plural(counts.suggestion, "suggestion"));
+
+  const status = $("status");
+  status.textContent = parts.length ? parts.join(" · ") : "Valid recipe";
+  status.dataset.severity = counts.error ? "error" : counts.warning ? "warning" : counts.suggestion ? "suggestion" : "ok";
+
   $("count").textContent = diagnostics.length ? String(diagnostics.length) : "";
+  const badge = $("badge");
+  badge.hidden = counts.error + counts.warning === 0;
+  badge.textContent = String(counts.error + counts.warning);
 
+  const list = $("problems");
   if (diagnostics.length === 0) {
     const li = document.createElement("li");
     li.className = "empty";
-    li.textContent = "No problem found.";
-    $("diagnostics").replaceChildren(li);
+    li.textContent = "No problems. This recipe is ready to share.";
+    list.replaceChildren(li);
     return;
   }
 
-  $("diagnostics").replaceChildren(
-    ...diagnostics.map((d) => {
-      const li = document.createElement("li");
+  const sorted = [...diagnostics].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.line - b.line);
+  list.replaceChildren(
+    ...sorted.map((d) => {
+      const [what, fix] = splitMessage(d.message);
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `diagnostic ${d.severity}`;
-      button.innerHTML = `<span class="badge"></span><span class="where"></span><span class="message"></span>`;
-      button.querySelector(".badge")!.textContent = d.severity;
-      button.querySelector(".where")!.textContent = `${d.line}:${d.column}`;
-      button.querySelector(".message")!.textContent = d.message;
+      button.className = `problem ${d.severity}`;
+      button.innerHTML = `<span class="severity"><span class="shape"></span><span class="name"></span></span><span class="text"><strong></strong><span class="fix"></span></span><span class="where mono"></span>`;
+      button.querySelector(".name")!.textContent = SEVERITY_LABELS[d.severity];
+      button.querySelector("strong")!.textContent = what;
+      button.querySelector(".fix")!.textContent = fix;
+      button.querySelector(".where")!.textContent = `Line ${d.line}, col ${d.column}`;
+      button.addEventListener("click", () => jumpTo(d));
 
-      // Jump to the word the diagnostic points at
-      button.addEventListener("click", () => {
-        const { from, to } = range(view.state.doc, d);
-        view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
-        view.focus();
-      });
-
+      const li = document.createElement("li");
       li.append(button);
       return li;
     }),
   );
 }
 
-let scaled: ScaleResult | undefined;
+// Recipe: scaled and converted for display only
 
-function renderScale(recipe: Recipe, ok: boolean) {
-  const message = $("scale-message");
-  const output = $<HTMLPreElement>("scaled");
-  const use = $<HTMLButtonElement>("scale-use");
-  const wanted = $<HTMLInputElement>("scale-to").value.trim();
-  const by = $<HTMLSelectElement>("scale-by").value;
+const OUNCE = 28.349523125;
 
-  const show = (text: string, isError = false) => {
-    message.textContent = text;
-    message.className = isError ? "error-text" : "muted";
-    output.hidden = use.hidden = true;
-    scaled = undefined;
+const tempOf = (recipe: Recipe) => recipe.header?.temp ?? recipe.steps.find((s) => s.kind === "TempChange")?.temp;
+
+/// A dose typed in the displayed unit, back in the recipe's unit
+const toSourceDose = (value: number, unit: string, written: string) =>
+  unit === written ? value : unit === "oz" ? value * OUNCE : value / OUNCE;
+
+let shown: RenderResult | undefined; // The card on screen, reused for the image
+
+/// Scaled and converted by @brewlang/render, for display only: the source never changes
+function renderRecipePane(recipe: Recipe, diagnostics: Diagnostic[]) {
+  const errors = diagnostics.filter((d) => d.severity === "error").length;
+  const notes = $("notes");
+  notes.replaceChildren();
+
+  const note = (text: string, kind: "error" | "info", onClick?: () => void) => {
+    const el = document.createElement(onClick ? "button" : "div");
+    el.className = `note ${kind}`;
+    el.textContent = text;
+    if (onClick) el.addEventListener("click", onClick);
+    notes.append(el);
   };
 
-  if (!wanted) return show(`Give a new ${by === "dose" ? "dose, like 25g" : "total water, like 400g"}.`);
-  if (!ok) return show("Fix the errors first: only a valid recipe can be scaled.", true);
-
-  const amount = /^(\d+(?:\.\d+)?)\s*([a-z]+)$/i.exec(wanted);
-  if (!amount) return show(`Write the amount with its unit, like ${by === "dose" ? "25g" : "400g"}.`, true);
-
-  const target = { value: Number(amount[1]), unit: amount[2]!.toLowerCase() };
-  scaled = by === "dose" ? scaleToDose(recipe, target) : scaleToWater(recipe, target);
-
-  const error = scaled.diagnostics.find((d) => d.severity === "error");
-  if (error) return show(error.message, true);
-
-  message.textContent = scaled.diagnostics.map((d) => d.message).join(" ");
-  message.className = "warning-text";
-  output.textContent = format(scaled.recipe);
-  output.hidden = use.hidden = false;
-}
-
-let converted: ConvertResult | undefined;
-let wantedUnits: ConvertUnits = {}; // What the selects ask for, until the recipe is replaced
-
-/// The units a recipe is written in; a measure it does not have is absent
-function recipeUnits(recipe: Recipe): ConvertUnits {
-  const { header, steps } = recipe;
-  const units: ConvertUnits = {};
-  if (!header) return units;
-
-  units.dose = header.dose.unit;
-  const water = header.water ?? steps.find((step) => step.kind === "Pour")?.water;
-  if (water) units.water = water.unit;
-  const temp = header.temp ?? steps.find((step) => step.kind === "TempChange")?.temp;
-  if (temp) units.temp = temp.unit;
-  return units;
-}
-
-/// Brewlang never turns weights into volumes: only the water units of the same kind are offered
-const WATER_KIND: Record<string, string> = { g: "weight", oz: "weight", ml: "volume", floz: "volume" };
-
-function renderUnits(recipe: Recipe, ok: boolean) {
-  const message = $("units-message");
-  const output = $<HTMLPreElement>("converted");
-  const use = $<HTMLButtonElement>("units-use");
-  const current = recipeUnits(recipe);
-
-  const show = (text: string, isError = false) => {
-    message.textContent = text;
-    message.className = isError ? "error-text" : "muted";
-    output.hidden = use.hidden = true;
-    converted = undefined;
-  };
-
-  // Each select shows the wanted unit, or the recipe's own; disabled when the recipe has no such measure
-  const selects = { dose: "unit-dose", water: "unit-water", temp: "unit-temp" } as const;
-  for (const [measure, id] of Object.entries(selects) as [keyof ConvertUnits, string][]) {
-    const select = $<HTMLSelectElement>(id);
-    const unit = current[measure];
-    select.disabled = !ok || unit === undefined;
-    if (unit !== undefined) select.value = wantedUnits[measure] ?? unit;
-  }
-  for (const option of $<HTMLSelectElement>("unit-water").options) {
-    option.disabled = current.water !== undefined && WATER_KIND[option.value] !== WATER_KIND[current.water];
+  if (errors) {
+    note(`${plural(errors, "error")} in the code. The recipe below may not brew as written.`, "error", () =>
+      jumpTo(diagnostics.find((d) => d.severity === "error")!),
+    );
   }
 
-  if (!ok) return show("Fix the errors first: only a valid recipe can be converted.", true);
+  shown = render(source(), {
+    factor: state.factor,
+    ...(state.weight && { weight: state.weight }),
+    ...(state.temp && { temp: state.temp }),
+    title: state.file.replace(/\.brew$/, ""),
+  });
+  for (const d of shown.notes) note(d.message, d.severity === "error" ? "error" : "info");
 
-  const changes = (Object.keys(wantedUnits) as (keyof ConvertUnits)[]).filter(
-    (measure) => current[measure] !== undefined && wantedUnits[measure] !== current[measure],
+  renderTools(recipe, shown.recipe, errors === 0);
+
+  const container = $("recipe");
+  if (!shown.html) {
+    const empty = document.createElement("p");
+    empty.className = "empty-recipe";
+    empty.textContent = "Start with a brewer line, like @V60 15g 250g 94°C.";
+    container.replaceChildren(empty);
+    return;
+  }
+  container.innerHTML = shown.html; // Escaped by toHtml
+}
+
+/// The segmented buttons: [value, label, active]
+function segmented(id: string, items: [string, string, boolean][], pick: (value: string) => void, disabled: boolean) {
+  $(id).replaceChildren(
+    ...items.map(([value, label, active]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.classList.toggle("on", active);
+      button.disabled = disabled;
+      button.addEventListener("click", () => pick(value));
+      return button;
+    }),
   );
-  if (changes.length === 0) return show("Pick other units to convert the recipe.");
-
-  converted = convert(recipe, wantedUnits);
-  const error = converted.diagnostics.find((d) => d.severity === "error");
-  if (error) return show(error.message, true);
-
-  message.textContent = "Amounts are rounded the way a scale shows them; times stay as written.";
-  message.className = "muted";
-  output.textContent = format(converted.recipe);
-  output.hidden = use.hidden = false;
 }
+
+function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
+  const dose = recipe.header?.dose;
+  const shownDose = shown.header?.dose;
+  const canScale = ok && dose !== undefined && dose.amount.max === undefined;
+
+  const input = $<HTMLInputElement>("dose");
+  input.disabled = !canScale;
+  if (document.activeElement !== input || state.doseText === undefined) {
+    input.value = shownDose ? String(shownDose.amount.value) : "";
+  }
+  $("dose-unit").textContent = shownDose?.unit ?? "g";
+
+  segmented(
+    "scales",
+    [
+      ["0.5", "½×", Math.abs(state.factor - 0.5) < 1e-6],
+      ["1", "1×", Math.abs(state.factor - 1) < 1e-6],
+      ["1.5", "1.5×", Math.abs(state.factor - 1.5) < 1e-6],
+      ["2", "2×", Math.abs(state.factor - 2) < 1e-6],
+    ],
+    (value) => {
+      state.factor = Number(value);
+      state.doseText = undefined;
+      refresh();
+    },
+    !canScale,
+  );
+
+  // Without a choice, the units are the author's: the dose's for the weight, the first temperature's
+  const weight = state.weight ?? dose?.unit;
+  segmented(
+    "weights",
+    [
+      ["g", "g", weight === "g"],
+      ["oz", "oz", weight === "oz"],
+    ],
+    (value) => {
+      state.weight = value as "g" | "oz";
+      state.doseText = undefined;
+      refresh();
+    },
+    !ok || !recipe.header,
+  );
+
+  const writtenTemp = tempOf(recipe)?.unit;
+  const temp = state.temp ?? writtenTemp;
+  segmented(
+    "temps",
+    [
+      ["°C", "°C", temp === "°C"],
+      ["°F", "°F", temp === "°F"],
+    ],
+    (value) => {
+      state.temp = value as "°C" | "°F";
+      refresh();
+    },
+    !ok || !writtenTemp,
+  );
+}
+
+$("dose").addEventListener("input", () => {
+  const input = $<HTMLInputElement>("dose");
+  state.doseText = input.value;
+  const { recipe } = check(source());
+  const dose = recipe.header?.dose;
+  const typed = parseFloat(input.value.replace(",", "."));
+  if (!dose || !(typed > 0)) return;
+
+  const shownUnit = $("dose-unit").textContent ?? dose.unit;
+  state.factor = toSourceDose(typed, shownUnit, dose.unit) / dose.amount.value;
+  refresh();
+});
+$("dose").addEventListener("blur", () => {
+  state.doseText = undefined;
+  refresh();
+});
+
+// Menus: dropdowns on wide screens, sheets on narrow ones
+
+function openMenu(menu: typeof state.menu) {
+  state.menu = state.menu === menu ? undefined : menu;
+  $("examples-menu").hidden = state.menu !== "examples";
+  $("share-menu").hidden = state.menu !== "share";
+  $("scrim").hidden = !state.menu;
+  if (state.menu === "share") $("share-url").textContent = shareUrl(source());
+}
+$("scrim").addEventListener("click", () => openMenu(undefined));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.menu) openMenu(undefined);
+});
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
+  button.addEventListener("click", () => {
+    const action = button.dataset.action;
+    if (action === "examples" || action === "share") openMenu(action);
+    if (action === "prompt") copyPrompt();
+  });
+}
+
+// Examples, named by their title, with the kind of brewer
+const examples = Object.entries(EXAMPLES)
+  .map(([file, text]) => {
+    const { recipe } = check(text);
+    const title = toJson(recipe).json?.metadata?.title ?? file.replace(/\.brew$/, "");
+    return { file, text, title, kind: recipe.header ? brewerKind(recipe.header.brewer) : "" };
+  })
+  .sort((a, b) => a.title.localeCompare(b.title));
+
+$("examples").replaceChildren(
+  ...examples.map((example) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "example";
+    button.innerHTML = `<strong></strong><span class="muted"></span>`;
+    button.querySelector("strong")!.textContent = example.title;
+    button.querySelector("span")!.textContent = example.kind;
+    button.addEventListener("click", () => {
+      state.file = example.file;
+      state.factor = 1;
+      state.weight = undefined;
+      state.temp = undefined;
+      state.doseText = undefined;
+      openMenu(undefined);
+      replace(example.text);
+    });
+    return button;
+  }),
+);
+
+// Share
+
+async function copy(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+$("copy-link").addEventListener("click", async () => {
+  const url = shareUrl(source());
+  history.replaceState(null, "", url);
+  openMenu(undefined);
+  toast((await copy(url)) ? "Link copied. Anyone who opens it sees this recipe." : "The link is in the address bar.");
+});
+
+$("download").addEventListener("click", async () => {
+  openMenu(undefined);
+  if (!shown?.model) return toast("Write a recipe first: it starts with a brewer line.");
+
+  const name = `${state.file.replace(/\.brew$/, "")}.png`;
+  const exportBox = $("export");
+  exportBox.innerHTML = toHtml(shown.model, { signed: true });
+  try {
+    await document.fonts.ready;
+    await downloadPng(exportBox.firstElementChild as HTMLElement, name, 1080, 1350);
+    toast(`Saved ${name} (1080 × 1350).`);
+  } catch {
+    toast("The image could not be made in this browser.");
+  } finally {
+    exportBox.replaceChildren();
+  }
+});
+
+async function copyPrompt() {
+  const spec = new URL(`${import.meta.env.BASE_URL}llms.txt`, location.origin).href;
+  const prompt = `Write my coffee recipe in Brewlang. The format is described at ${spec}. Reply with the .brew file only.\n\nMy recipe: `;
+  toast((await copy(prompt)) ? `Prompt copied. It points your AI to ${spec}.` : "The clipboard is blocked in this browser.");
+}
+
+// Theme: the system's until the reader picks one
+
+$("theme").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  storage.set("theme", root.dataset.theme);
+});
 
 function refresh() {
   const text = source();
-  storage.set(text);
+  storage.set("source", text);
+  storage.set("file", state.file);
 
   const { recipe, diagnostics } = check(text);
-  const ok = !diagnostics.some((d) => d.severity === "error");
-
-  renderSummary(recipe, ok);
-  renderDiagnostics(diagnostics);
-  renderScale(recipe, ok);
-  renderUnits(recipe, ok);
-  $<HTMLButtonElement>("format").disabled = !ok;
+  $("file").textContent = state.file;
+  renderProblems(diagnostics);
+  renderRecipePane(recipe, diagnostics);
 }
-
-// Example picker
-const examples = $<HTMLSelectElement>("examples");
-for (const name of Object.keys(EXAMPLES).sort()) {
-  const option = document.createElement("option");
-  option.value = option.textContent = name;
-  examples.append(option);
-}
-examples.addEventListener("change", () => {
-  const example = EXAMPLES[examples.value];
-  wantedUnits = {}; // A new recipe starts in its own units
-  if (example !== undefined) replace(example);
-  examples.value = "";
-});
-
-$("format").addEventListener("click", () => {
-  const { recipe, diagnostics } = check(source());
-  if (diagnostics.some((d) => d.severity === "error")) return;
-  const formatted = format(recipe);
-  if (formatted !== source()) replace(formatted);
-});
-
-$("share").addEventListener("click", async () => {
-  const url = `${location.origin}${location.pathname}#src=${encode(source())}`;
-  history.replaceState(null, "", url);
-  const button = $<HTMLButtonElement>("share");
-  try {
-    await navigator.clipboard.writeText(url);
-    button.textContent = "Link copied";
-  } catch {
-    button.textContent = "Link in the address bar";
-  }
-  setTimeout(() => (button.textContent = "Copy link"), 2000);
-});
-
-$("scale").addEventListener("submit", (event) => event.preventDefault());
-$("scale-to").addEventListener("input", refresh);
-$("scale-by").addEventListener("change", refresh);
-$("scale-use").addEventListener("click", () => {
-  if (scaled) replace(format(scaled.recipe));
-  $<HTMLInputElement>("scale-to").value = "";
-  refresh();
-});
-
-$("units").addEventListener("submit", (event) => event.preventDefault());
-$("units").addEventListener("change", () => {
-  wantedUnits = {
-    dose: $<HTMLSelectElement>("unit-dose").value as DoseUnit,
-    water: $<HTMLSelectElement>("unit-water").value as WaterUnit,
-    temp: $<HTMLSelectElement>("unit-temp").value as TempUnit,
-  };
-  refresh();
-});
-$("units-use").addEventListener("click", () => {
-  if (converted) replace(format(converted.recipe));
-  wantedUnits = {};
-  refresh();
-});
 
 refresh();
