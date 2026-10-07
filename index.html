@@ -55,7 +55,7 @@
 
         <section class="pane recipe-pane" aria-label="Recipe">
           <div class="pane-head recipe-tools">
-            <span class="label desktop-only">Recipe</span>
+            <button type="button" class="btn-ghost customize" data-action="customize">Customize</button>
             <div class="tools">
               <label class="dose">Dose<span class="field"><input id="dose" inputmode="decimal" aria-label="Dose" autocomplete="off" /><span id="dose-unit"></span></span></label>
               <span class="divider"></span>
@@ -86,7 +86,13 @@
 
       <div id="examples-menu" class="menu examples-menu" hidden>
         <div class="sheet-handle"></div>
-        <div class="sheet-title">Load an example</div>
+        <div class="sheet-title">Open a recipe</div>
+        <label class="menu-item open-file">
+          <strong>Open a .brew file…</strong>
+          <span class="muted">From your computer. You can also drop it anywhere on the page.</span>
+          <input id="open-file" type="file" accept=".brew,text/plain" hidden />
+        </label>
+        <div class="menu-rule"></div>
         <div id="examples" class="menu-list"></div>
       </div>
 
@@ -103,7 +109,36 @@
           <strong>Download image</strong>
           <span class="muted">A 4:5 PNG of this recipe card, sized for Instagram.</span>
         </button>
+        <div class="menu-rule"></div>
+        <button type="button" id="download-brew" class="menu-item">
+          <strong>Download .brew</strong>
+          <span class="muted">The recipe as a text file, to keep, edit or open in any Brewlang tool.</span>
+        </button>
       </div>
+
+      <div id="customize-menu" class="menu customize-menu" hidden>
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Customize the card</div>
+        <div class="custom-section">
+          <div class="label">Theme</div>
+          <div id="custom-themes" class="theme-tiles"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Accent</div>
+          <div id="custom-accents" class="swatches"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Title font</div>
+          <div id="custom-fonts" class="segmented fonts"></div>
+        </div>
+        <div class="custom-actions">
+          <button type="button" id="copy-css" class="btn">Copy CSS</button>
+          <button type="button" id="reset-style" class="btn-ghost">Reset</button>
+        </div>
+        <p class="custom-note muted">Applies to the card, the image and the shared link. The recipe itself does not change.</p>
+      </div>
+
+      <div id="drop" class="drop" hidden><span>Drop a .brew file to open it</span></div>
 
       <div id="toast" class="toast" role="status" hidden></div>
     </div>

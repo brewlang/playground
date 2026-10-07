@@ -8,7 +8,9 @@ import { brewAutocomplete } from "./complete";
 import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
-import { decode, downloadPng, shareUrl } from "./share";
+import type { CardStyle } from "./customize";
+import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, applyStyle, css, fromParams, toParams } from "./customize";
+import { decode, downloadPng, downloadText, shareUrl } from "./share";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -43,12 +45,22 @@ const state = {
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
   doseText: undefined as string | undefined, // The dose being typed, kept as is until it changes
-  menu: undefined as "examples" | "share" | undefined,
+  menu: undefined as "examples" | "share" | "customize" | undefined,
 };
 
+// A shared link carries the recipe and the card's style: '#src=…&t=roaster&a=berry'
+const hash = new URLSearchParams(location.hash.slice(1));
 const fromHash = () => {
-  const match = /^#src=(.+)$/.exec(location.hash);
-  return match?.[1] ? decode(match[1]) : null;
+  const src = hash.get("src");
+  return src ? decode(src) : null;
+};
+
+let style: CardStyle = hash.has("src") ? fromParams(hash) : fromParams(new URLSearchParams(storage.get("style") ?? ""));
+
+/// The link to share: the recipe, then the style when it is not the default
+const link = () => {
+  const params = toParams(style).toString();
+  return shareUrl(source()) + (params ? `&${params}` : "");
 };
 
 let initial = fromHash();
@@ -222,6 +234,7 @@ function renderRecipePane(recipe: Recipe, diagnostics: Diagnostic[]) {
     return;
   }
   container.innerHTML = shown.html; // Escaped by toHtml
+  applyStyle(container.firstElementChild, style);
 }
 
 /// The segmented buttons: [value, label, active]
@@ -322,8 +335,9 @@ function openMenu(menu: typeof state.menu) {
   state.menu = state.menu === menu ? undefined : menu;
   $("examples-menu").hidden = state.menu !== "examples";
   $("share-menu").hidden = state.menu !== "share";
+  $("customize-menu").hidden = state.menu !== "customize";
   $("scrim").hidden = !state.menu;
-  if (state.menu === "share") $("share-url").textContent = shareUrl(source());
+  if (state.menu === "share") $("share-url").textContent = link();
 }
 $("scrim").addEventListener("click", () => openMenu(undefined));
 document.addEventListener("keydown", (event) => {
@@ -333,10 +347,60 @@ document.addEventListener("keydown", (event) => {
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
   button.addEventListener("click", () => {
     const action = button.dataset.action;
-    if (action === "examples" || action === "share") openMenu(action);
+    if (action === "examples" || action === "share" || action === "customize") openMenu(action);
     if (action === "prompt") copyPrompt();
   });
 }
+
+/// Show another recipe, in its own units and amounts
+function load(text: string, file: string) {
+  state.file = file;
+  state.factor = 1;
+  state.weight = undefined;
+  state.temp = undefined;
+  state.doseText = undefined;
+  replace(text);
+}
+
+/// Open a file from the computer; a .brew file is plain UTF-8 text
+async function openFile(file: File | undefined) {
+  if (!file) return;
+  if (file.size > 1_000_000) return toast(`${file.name} is too big for a recipe.`);
+  load(await file.text(), file.name);
+  showTab("code");
+  toast(`Opened ${file.name}.`);
+}
+
+$<HTMLInputElement>("open-file").addEventListener("change", (event) => {
+  const input = event.target as HTMLInputElement;
+  openMenu(undefined);
+  void openFile(input.files?.[0]);
+  input.value = ""; // Opening the same file again still fires 'change'
+});
+
+// Drop a file anywhere on the page; dragging text or links does nothing
+const hasFile = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+let dragDepth = 0;
+document.addEventListener("dragenter", (event) => {
+  if (!hasFile(event)) return;
+  dragDepth++;
+  $("drop").hidden = false;
+});
+document.addEventListener("dragleave", (event) => {
+  if (!hasFile(event)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) $("drop").hidden = true;
+});
+document.addEventListener("dragover", (event) => {
+  if (hasFile(event)) event.preventDefault();
+});
+document.addEventListener("drop", (event) => {
+  if (!hasFile(event)) return;
+  event.preventDefault();
+  dragDepth = 0;
+  $("drop").hidden = true;
+  void openFile(event.dataTransfer?.files[0]);
+});
 
 // Examples, named by their title, with the kind of brewer
 const examples = Object.entries(EXAMPLES)
@@ -356,13 +420,8 @@ $("examples").replaceChildren(
     button.querySelector("strong")!.textContent = example.title;
     button.querySelector("span")!.textContent = example.kind;
     button.addEventListener("click", () => {
-      state.file = example.file;
-      state.factor = 1;
-      state.weight = undefined;
-      state.temp = undefined;
-      state.doseText = undefined;
       openMenu(undefined);
-      replace(example.text);
+      load(example.text, example.file);
     });
     return button;
   }),
@@ -380,7 +439,7 @@ async function copy(text: string) {
 }
 
 $("copy-link").addEventListener("click", async () => {
-  const url = shareUrl(source());
+  const url = link();
   history.replaceState(null, "", url);
   openMenu(undefined);
   toast((await copy(url)) ? "Link copied. Anyone who opens it sees this recipe." : "The link is in the address bar.");
@@ -393,6 +452,7 @@ $("download").addEventListener("click", async () => {
   const name = `${state.file.replace(/\.brew$/, "")}.png`;
   const exportBox = $("export");
   exportBox.innerHTML = toHtml(shown.model, { signed: true });
+  applyStyle(exportBox.firstElementChild, style);
   try {
     await document.fonts.ready;
     await downloadPng(exportBox.firstElementChild as HTMLElement, name, 1080, 1350);
@@ -404,11 +464,93 @@ $("download").addEventListener("click", async () => {
   }
 });
 
+$("download-brew").addEventListener("click", () => {
+  openMenu(undefined);
+  const name = state.file.endsWith(".brew") ? state.file : `${state.file}.brew`;
+  downloadText(source(), name);
+  toast(`Saved ${name}.`);
+});
+
 async function copyPrompt() {
   const spec = new URL(`${import.meta.env.BASE_URL}llms.txt`, location.origin).href;
   const prompt = `Write my coffee recipe in Brewlang. The format is described at ${spec}. Reply with the .brew file only.\n\nMy recipe: `;
   toast((await copy(prompt)) ? `Prompt copied. It points your AI to ${spec}.` : "The clipboard is blocked in this browser.");
 }
+
+// Customize: the card's theme, accent and title font, saved and carried by the shared link
+
+/// A row of choices: [value, label, active], built as buttons with an optional look
+function choices(id: string, items: [string, string, boolean][], pick: (value: string) => void, decorate?: (button: HTMLButtonElement, value: string) => void) {
+  $(id).replaceChildren(
+    ...items.map(([value, label, active]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.title = label;
+      button.classList.toggle("on", active);
+      button.setAttribute("aria-pressed", String(active));
+      decorate?.(button, value);
+      button.addEventListener("click", () => pick(value));
+      return button;
+    }),
+  );
+}
+
+function setStyle(next: CardStyle) {
+  style = next;
+  storage.set("style", toParams(style).toString());
+  renderCustomize();
+  refresh();
+}
+
+function renderCustomize() {
+  choices(
+    "custom-themes",
+    [["auto", "Auto", style.theme === "auto"], ...Object.entries(THEMES).map(([key, t]): [string, string, boolean] => [key, t.label, style.theme === key])],
+    (value) => setStyle({ ...style, theme: value as CardStyle["theme"] }),
+    (button, value) => {
+      // A small preview of the card: its paper, its ink and its accent
+      const palette = value === "auto" ? undefined : THEMES[value as keyof typeof THEMES].palette;
+      button.style.setProperty("--tile-bg", palette?.bg ?? "var(--card)");
+      button.style.setProperty("--tile-ink", palette?.ink ?? "var(--ink)");
+      button.style.setProperty("--tile-accent", palette?.accent ?? "var(--accent)");
+    },
+  );
+
+  const custom = style.accent?.startsWith("#") ? style.accent : undefined;
+  choices(
+    "custom-accents",
+    [["", "Theme", style.accent === undefined], ...Object.entries(ACCENTS).map(([key, a]): [string, string, boolean] => [key, a.label, style.accent === key])],
+    (value) => {
+      const { accent: _, ...rest } = style;
+      setStyle(value ? { ...rest, accent: value } : rest);
+    },
+    (button, value) => button.style.setProperty("--swatch", value ? ACCENTS[value]!.color : "transparent"),
+  );
+  const picker = document.createElement("label");
+  picker.className = `swatch-custom${custom ? " on" : ""}`;
+  picker.title = "Any color";
+  picker.innerHTML = `<input type="color" aria-label="Any accent color" />`;
+  const input = picker.querySelector("input")!;
+  input.value = custom ?? "#b5542e";
+  if (custom) picker.style.setProperty("--swatch", custom);
+  input.addEventListener("input", () => setStyle({ ...style, accent: input.value }));
+  $("custom-accents").append(picker);
+
+  choices(
+    "custom-fonts",
+    Object.entries(FONTS).map(([key, f]): [string, string, boolean] => [key, f.label, style.font === key]),
+    (value) => setStyle({ ...style, font: value as CardStyle["font"] }),
+    (button, value) => (button.style.fontFamily = FONTS[value as keyof typeof FONTS].family),
+  );
+}
+
+$("copy-css").addEventListener("click", async () => {
+  toast((await copy(css(style))) ? "CSS copied: paste it next to brew.css to get this card." : "The clipboard is blocked in this browser.");
+});
+$("reset-style").addEventListener("click", () => setStyle({ ...DEFAULT_STYLE }));
+
+renderCustomize();
 
 // Theme: the system's until the reader picks one
 

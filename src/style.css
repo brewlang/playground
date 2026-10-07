@@ -862,6 +862,133 @@ button {
   margin: 2px 8px;
 }
 
+.customize {
+  height: 30px;
+  margin-left: -10px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.customize::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: conic-gradient(var(--accent) 0 33%, var(--ink) 0 66%, var(--rule) 0);
+}
+
+.customize-menu {
+  top: 108px;
+  left: calc(50% + 12px);
+  width: 340px;
+  padding: 18px;
+  gap: 18px;
+}
+.custom-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.theme-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.theme-tiles button {
+  height: 64px;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--tile-accent), var(--tile-accent)) 8px 10px / 16px 3px no-repeat,
+    linear-gradient(var(--tile-ink), var(--tile-ink)) 8px 18px / 30px 6px no-repeat,
+    var(--tile-bg);
+  color: var(--tile-ink);
+  font: 500 12px var(--sans);
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+.theme-tiles button.on {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.swatches button,
+.swatch-custom {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--swatch);
+  font-size: 0;
+  cursor: pointer;
+  position: relative;
+}
+.swatches button:first-child {
+  /* 'Theme': the theme's own accent, a diagonal line for none */
+  background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%);
+}
+.swatches .on {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.swatch-custom {
+  overflow: hidden;
+  background: var(--swatch, conic-gradient(red, yellow, lime, cyan, blue, magenta, red));
+}
+.swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented.fonts button {
+  flex: 1;
+  font-size: 15px;
+}
+
+.custom-actions {
+  display: flex;
+  gap: 8px;
+}
+.custom-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.open-file {
+  cursor: pointer;
+}
+
+.drop {
+  position: absolute;
+  inset: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--bg) 85%, transparent);
+  pointer-events: none;
+}
+.drop[hidden] {
+  display: none;
+}
+.drop span {
+  font: italic 400 26px var(--serif);
+}
+
 .toast {
   position: absolute;
   left: 50%;
@@ -1181,5 +1308,25 @@ button {
   }
   .toast {
     bottom: 84px;
+  }
+  .customize-menu {
+    top: auto;
+    left: 0;
+    width: auto;
+    gap: 16px;
+    padding: 10px 16px 24px;
+  }
+  .customize-menu .sheet-title {
+    padding: 4px 0 0;
+  }
+
+  /* Customize on its own line, above the dose, scale and units */
+  .recipe-tools {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .customize {
+    align-self: flex-start;
   }
 }
