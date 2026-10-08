@@ -33,7 +33,7 @@ target 3:00
   - `grind <size>`: at most once, right after the header. Sizes: `extra-fine`, `fine`, `medium-fine`, `medium`, `medium-coarse`, `coarse`, `extra-coarse`.
   - A pour: `[time] amount [~duration] [qualifiers]`. `150g` is the total on the scale after the pour; `+60g` is water to add. Totals must go up, and the last one must equal the header's total water when the header gives one.
   - Pour qualifiers: `bloom`, plus at most one technique among `spiral`, `center`, `pulse`. No other word is allowed after a pour.
-  - An action: `[time] /name [~duration]`, alone on its line. Known actions: `/swirl`, `/stir`, `/skim`, `/wait`, `/rinse`, `/level-bed`, `/press` (alias `/plunge`, AeroPress and French press), `/invert` and `/flip` (AeroPress), `/open` and `/close` (Switch, Clever, Pulsar), `/drawdown` (drippers and valve brewers). Other names are accepted.
+  - An action: `[time] /name [~duration]`, alone on its line. Known actions: `/swirl`, `/stir`, `/skim`, `/wait`, `/rinse`, `/level-bed`, `/add-coffee`, `/press` (alias `/plunge`, AeroPress and French press), `/invert` and `/flip` (AeroPress), `/open` and `/close` (Switch, Clever, Pulsar), `/drawdown` (drippers and valve brewers). Other names are accepted.
   - A temperature alone on its line, like `90°C`, applies to every following step.
   - `target 3:00`: when the brew should end. At most once.
   - `-- text`: a comment, alone or at the end of a line.
@@ -41,6 +41,7 @@ target 3:00
 - Steps without a time before the first timed step are preparation, done before starting the timer (`/rinse`, `/close`, `/invert`).
 - A recipe can have no times at all: steps then follow each other at the brewer's pace, and waits are written `/wait ~45s`. `/wait` alone means wait until it is ready.
 - The ratio is never written: tools compute it.
+- The coffee is assumed to be in the brewer from the start. When it goes in later (water first in a Clever, once the water has risen in a siphon), write `/add-coffee` at that moment.
 - A valve brewer that starts closed begins with `/close`. An inverted AeroPress begins with `/invert` and uses `/flip` before `/press`.
 
 ## When you write a recipe
