@@ -9,7 +9,7 @@ Try [Brewlang](../brewlang) in the browser: write a `.brew` recipe and see its d
 - **Dose, scale and units** (g or oz, °C or °F) change only what the card shows: the source keeps the author's amounts and units.
 - **Customize** the card: a theme (Paper, Night, Roaster, or the playground's), an accent color and a title font. The style goes into the image and the shared link, and "Copy CSS" gives the `--brew-*` variables to reuse it with `@brewlang/render`.
 - **Share:** a link that carries the recipe itself, a 1080 × 1350 image of the card, or the `.brew` file itself.
-- **Copy prompt for your AI:** asks an assistant to write a recipe in Brewlang, pointing it to [`llms.txt`](public/llms.txt).
+- **Copy prompt for your AI:** asks an assistant to write a recipe in Brewlang, pointing it to [`llms.txt`](https://github.com/brewlang/brewlang/blob/main/docs/llms.txt), which lives in the brewlang repo.
 - **Light and dark themes**, and a layout with tabs on phones.
 - **Open** a `.brew` file from the Examples menu, or drop it on the page. **Examples** come from `../brewlang/examples`.
 
