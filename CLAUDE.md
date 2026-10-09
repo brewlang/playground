@@ -23,6 +23,10 @@ There are no tests here: the language behavior is tested in `../brewlang`.
 
 `.github/workflows/deploy.yml` builds the `brewlang` monorepo (both packages, `npm run build` at its root) then the playground side by side, as locally, and publishes `dist/` on GitHub Pages at `/playground/` (hence `base` in `vite.config.ts`, for builds and `vite preview`).
 
+## Analytics
+
+Cloudflare Web Analytics counts visits, without cookies: its script is at the end of `index.html`, with the same token as brewlang.github.io, so both show in one Cloudflare dashboard.
+
 ## Architecture
 
 The layout follows the "Playground App" design (claude.ai/design): code and problems on the left, the recipe card on the right; below 860px, Code/Recipe tabs with the actions in a bottom bar and the menus as sheets.
