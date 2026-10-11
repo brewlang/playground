@@ -201,16 +201,16 @@ function renderRecipePane(recipe: Recipe, diagnostics: Diagnostic[]) {
   const notes = $("notes");
   notes.replaceChildren();
 
-  const note = (text: string, kind: "error" | "info", onClick?: () => void) => {
+  const note = (text: string, onClick?: () => void) => {
     const el = document.createElement(onClick ? "button" : "div");
-    el.className = `note ${kind}`;
+    el.className = "note error";
     el.textContent = text;
     if (onClick) el.addEventListener("click", onClick);
     notes.append(el);
   };
 
   if (errors) {
-    note(`${plural(errors, "error")} in the code. The recipe below may not brew as written.`, "error", () =>
+    note(`${plural(errors, "error")} in the code. The recipe below may not brew as written.`, () =>
       jumpTo(diagnostics.find((d) => d.severity === "error")!),
     );
   }
@@ -221,7 +221,8 @@ function renderRecipePane(recipe: Recipe, diagnostics: Diagnostic[]) {
     ...(state.temp && { temp: state.temp }),
     title: state.file.replace(/\.brew$/, ""),
   });
-  for (const d of shown.notes) note(d.message, d.severity === "error" ? "error" : "info");
+  // Only failures: the scaling warning ("Amounts ×1.5, times unchanged") is left out
+  for (const d of shown.notes) if (d.severity === "error") note(d.message);
 
   renderTools(recipe, shown.recipe, errors === 0);
 
