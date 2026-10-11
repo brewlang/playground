@@ -678,6 +678,29 @@ button {
   opacity: 0.5;
 }
 
+/* A narrow recipe pane (a laptop window, under ~1400px) can't hold every tool on one line:
+   they wrap, and the 'Scale' label goes. The mobile layout below still wins under 860px */
+.recipe-pane {
+  container: recipe / inline-size;
+}
+@container recipe (max-width: 760px) {
+  .recipe-tools {
+    height: auto;
+    min-height: 44px;
+    padding-block: 8px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .recipe-tools .tools {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .recipe-tools .desktop-only,
+  .recipe-tools .divider {
+    display: none;
+  }
+}
+
 /* Recipe */
 
 .recipe-scroll {
