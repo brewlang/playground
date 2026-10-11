@@ -26,6 +26,13 @@
           <a href="https://github.com/brewlang/brewlang" class="logo">Brewlang</a>
           <span>Playground</span>
         </div>
+        <!-- On narrow screens, the Code/Recipe tabs sit in the top bar -->
+        <nav class="tabs" aria-label="View">
+          <div class="segmented wide">
+            <button type="button" id="tab-code" class="on">Code<span id="badge" class="badge" hidden></span></button>
+            <button type="button" id="tab-recipe">Recipe</button>
+          </div>
+        </nav>
         <button type="button" class="btn desktop-only" data-action="examples">Examples<span class="caret">▼</span></button>
         <div id="layout" class="segmented layout desktop-only" role="group" aria-label="Layout">
           <button type="button" data-layout="code" title="Code only">Code</button>
@@ -38,13 +45,6 @@
         <button type="button" class="theme-toggle" id="theme" title="Switch theme" aria-label="Switch theme"><span></span></button>
       </header>
 
-      <nav class="tabs" aria-label="View">
-        <div class="segmented wide">
-          <button type="button" id="tab-code" class="on">Code<span id="badge" class="badge" hidden></span></button>
-          <button type="button" id="tab-recipe">Recipe</button>
-        </div>
-      </nav>
-
       <main class="panes" data-tab="code" data-layout="split">
         <section class="pane code-pane" aria-label="Code">
           <div class="pane-head">
@@ -53,7 +53,9 @@
           </div>
           <div id="editor"></div>
           <div class="problems">
-            <div class="label">Problems<span id="count" class="mono"></span></div>
+            <div id="problems-toggle" class="label" aria-controls="problems" aria-expanded="false">
+              Problems<span id="count" class="mono"></span><span id="problems-status" class="status mobile-only"></span>
+            </div>
             <ul id="problems"></ul>
           </div>
         </section>
@@ -76,7 +78,7 @@
             <button type="button" class="btn-ghost customize" data-action="customize" title="Customize the card">Customize</button>
             <div class="tools">
               <button type="button" id="scale-button" class="btn scale-button" data-action="scale" aria-haspopup="true">
-                <span class="muted">Scale</span><strong id="scale-value" class="mono">1×</strong><span class="caret">▼</span>
+                <span class="muted">Scale</span><strong id="scale-value" class="mono">1×</strong><span id="scale-summary" class="mono mobile-only"></span><span class="caret">▼</span>
               </button>
               <span class="divider"></span>
               <div class="units" title="Display units only. The source keeps the author's units.">
@@ -92,6 +94,18 @@
           </div>
         </section>
       </main>
+
+      <!-- Characters a phone keyboard hides, shown above it while the editor has focus -->
+      <div id="keybar" class="keybar" hidden>
+        <button type="button" data-insert="@">@</button>
+        <button type="button" data-insert="/">/</button>
+        <button type="button" data-insert="~">~</button>
+        <button type="button" data-insert=":">:</button>
+        <button type="button" data-insert="+">+</button>
+        <button type="button" data-insert="°C">°C</button>
+        <button type="button" data-insert="°F">°F</button>
+        <button type="button" data-insert="-- ">--</button>
+      </div>
 
       <footer class="mobile-actions">
         <button type="button" class="btn" data-action="examples">Examples</button>
@@ -135,7 +149,7 @@
 
       <div id="scale-menu" class="menu scale-menu" hidden>
         <div class="sheet-handle"></div>
-        <div class="sheet-title">Scale the recipe</div>
+        <div class="sheet-title">Scale and units</div>
         <div id="scales" class="scale-list"></div>
         <div class="menu-rule"></div>
         <label class="scale-custom">
@@ -146,6 +160,9 @@
           <span>Water</span>
           <span class="field"><input id="water" inputmode="decimal" aria-label="Water" autocomplete="off" /><span id="water-unit"></span></span>
         </label>
+        <!-- On narrow screens, the units move here from the toolbar, and Customize opens from here -->
+        <div id="sheet-units" class="sheet-units mobile-only"></div>
+        <button type="button" class="menu-item sheet-customize mobile-only" data-action="customize"><strong>Customize the card</strong></button>
       </div>
 
       <div id="customize-menu" class="menu customize-menu" hidden>
