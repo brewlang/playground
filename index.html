@@ -27,6 +27,11 @@
           <span>Playground</span>
         </div>
         <button type="button" class="btn desktop-only" data-action="examples">Examples<span class="caret">▼</span></button>
+        <div id="layout" class="segmented layout desktop-only" role="group" aria-label="Layout">
+          <button type="button" data-layout="code" title="Code only">Code</button>
+          <button type="button" data-layout="split" title="Code and recipe side by side">Split</button>
+          <button type="button" data-layout="recipe" title="Recipe only">Recipe</button>
+        </div>
         <div class="spacer"></div>
         <button type="button" class="btn-ghost desktop-only" data-action="prompt">Copy prompt for your AI</button>
         <button type="button" class="btn-primary desktop-only" data-action="share">Share</button>
@@ -40,7 +45,7 @@
         </div>
       </nav>
 
-      <main class="panes" data-tab="code">
+      <main class="panes" data-tab="code" data-layout="split">
         <section class="pane code-pane" aria-label="Code">
           <div class="pane-head">
             <span id="file" class="mono muted">recipe.brew</span>
@@ -53,17 +58,31 @@
           </div>
         </section>
 
+        <div
+          id="gutter"
+          class="gutter"
+          role="separator"
+          tabindex="0"
+          aria-orientation="vertical"
+          aria-label="Resize the code and the recipe"
+          aria-valuemin="20"
+          aria-valuemax="80"
+          aria-valuenow="50"
+          title="Drag to resize, double-click to reset"
+        ></div>
+
         <section class="pane recipe-pane" aria-label="Recipe">
           <div class="pane-head recipe-tools">
-            <button type="button" class="btn-ghost customize" data-action="customize">Customize</button>
+            <button type="button" class="btn-ghost customize" data-action="customize" title="Customize the card">Customize</button>
             <div class="tools">
-              <label class="dose">Dose<span class="field"><input id="dose" inputmode="decimal" aria-label="Dose" autocomplete="off" /><span id="dose-unit"></span></span></label>
+              <label class="dose"><span class="dose-label">Dose</span><span class="field"><input id="dose" inputmode="decimal" aria-label="Dose" autocomplete="off" /><span id="dose-unit"></span></span></label>
               <span class="divider"></span>
-              <span class="muted desktop-only">Scale</span>
-              <div id="scales" class="segmented"></div>
+              <button type="button" id="scale-button" class="btn scale-button" data-action="scale" aria-haspopup="true">
+                <span class="muted">Scale</span><strong id="scale-value" class="mono">1×</strong><span class="caret">▼</span>
+              </button>
               <span class="divider"></span>
-              <span class="muted mobile-only">Units</span>
               <div class="units" title="Display units only. The source keeps the author's units.">
+                <span class="muted mobile-only">Units</span>
                 <div id="weights" class="segmented" aria-label="Weight unit"></div>
                 <div id="temps" class="segmented" aria-label="Temperature unit"></div>
               </div>
@@ -114,6 +133,17 @@
           <strong>Download .brew</strong>
           <span class="muted">The recipe as a text file, to keep, edit or open in any Brewlang tool.</span>
         </button>
+      </div>
+
+      <div id="scale-menu" class="menu scale-menu" hidden>
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Scale the recipe</div>
+        <div id="scales" class="scale-list"></div>
+        <div class="menu-rule"></div>
+        <label class="scale-custom">
+          <span>Custom</span>
+          <span class="field"><input id="scale-input" inputmode="decimal" aria-label="Custom scale" autocomplete="off" /><span>×</span></span>
+        </label>
       </div>
 
       <div id="customize-menu" class="menu customize-menu" hidden>
