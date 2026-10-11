@@ -945,7 +945,7 @@ button {
   font-weight: 400;
 }
 .scale-menu {
-  width: 200px;
+  width: 220px;
 }
 .scale-list {
   display: flex;
@@ -991,7 +991,6 @@ button {
     .recipe-tools .tools {
       gap: 8px;
     }
-    .recipe-tools .dose-label,
     .scale-button .muted {
       display: none;
     }

@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from "codemirror";
 import type { Diagnostic, Recipe } from "brewlang";
-import { check, toJson } from "brewlang";
+import { check, toJson, totalWater } from "brewlang";
 import type { RenderResult } from "@brewlang/render";
 import { brewerKind, render, toHtml } from "@brewlang/render";
 import "@brewlang/render/brew.css";
@@ -44,7 +44,6 @@ const state = {
   factor: 1,
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
-  doseText: undefined as string | undefined, // The dose being typed, kept as is until it changes
   menu: undefined as "examples" | "share" | "customize" | "scale" | undefined,
 };
 
@@ -269,8 +268,15 @@ const OUNCE = 28.349523125;
 const tempOf = (recipe: Recipe) => recipe.header?.temp ?? recipe.steps.find((s) => s.kind === "TempChange")?.temp;
 
 /// A dose typed in the displayed unit, back in the recipe's unit
-const toSourceDose = (value: number, unit: string, written: string) =>
-  unit === written ? value : unit === "oz" ? value * OUNCE : value / OUNCE;
+const FLUID_OUNCE = 29.5735295625;
+
+/// An amount typed in the shown unit, in the unit the recipe is written in: oz -> g, floz -> ml and back
+function toSourceUnit(value: number, unit: string, written: string) {
+  if (unit === written) return value;
+  if (unit === "oz") return value * OUNCE;
+  if (written === "oz") return value / OUNCE;
+  return unit === "floz" ? value * FLUID_OUNCE : value / FLUID_OUNCE;
+}
 
 let shown: RenderResult | undefined; // The card on screen, reused for the image
 
@@ -337,12 +343,17 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
   const shownDose = shown.header?.dose;
   const canScale = ok && dose !== undefined && dose.amount.max === undefined;
 
-  const input = $<HTMLInputElement>("dose");
-  input.disabled = !canScale;
-  if (document.activeElement !== input || state.doseText === undefined) {
-    input.value = shownDose ? String(shownDose.amount.value) : "";
-  }
+  // The coffee and the water as shown; a field being typed in keeps its text
+  const doseInput = $<HTMLInputElement>("dose");
+  doseInput.disabled = !canScale;
+  if (document.activeElement !== doseInput) doseInput.value = shownDose ? String(shownDose.amount.value) : "";
   $("dose-unit").textContent = shownDose?.unit ?? "g";
+
+  const water = ok ? totalWater(shown) : undefined;
+  const waterInput = $<HTMLInputElement>("water");
+  waterInput.disabled = !canScale || !water || water.low !== water.high;
+  if (document.activeElement !== waterInput) waterInput.value = water && !waterInput.disabled ? String(water.low) : "";
+  $("water-unit").textContent = water?.unit ?? "g";
 
   // Scale: a button showing the factor, and its menu of usual factors
   $<HTMLButtonElement>("scale-button").disabled = !canScale;
@@ -360,8 +371,6 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
       return button;
     }),
   );
-  const custom = $<HTMLInputElement>("scale-input");
-  if (document.activeElement !== custom) custom.value = String(round(state.factor));
 
   // Without a choice, the units are the author's: the dose's for the weight, the first temperature's
   const weight = state.weight ?? dose?.unit;
@@ -373,8 +382,7 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
     ],
     (value) => {
       state.weight = value as "g" | "oz";
-      state.doseText = undefined;
-      refresh();
+          refresh();
     },
     !ok || !recipe.header,
   );
@@ -395,7 +403,7 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
   );
 }
 
-/// The usual factors of the scale menu; any other is typed on its last line
+/// The usual factors of the scale menu; under them, the coffee or the water to scale to
 const SCALES: readonly [number, string][] = [
   [0.5, "½×"],
   [1, "1×"],
@@ -411,34 +419,32 @@ const factorLabel = (factor: number) => SCALES.find(([value]) => Math.abs(value 
 
 function setFactor(factor: number) {
   state.factor = factor;
-  state.doseText = undefined;
   refresh();
 }
 
-$("scale-input").addEventListener("input", () => {
-  const typed = parseFloat($<HTMLInputElement>("scale-input").value.replace(",", "."));
-  if (typed > 0 && typed <= 20) setFactor(typed);
-});
-$("scale-input").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") openMenu(undefined);
-});
+/// Scale to an amount typed in the menu: the factor is the typed amount over the recipe's own
+function scaleTo(input: HTMLInputElement, unit: string, written: { value: number; unit: string } | undefined) {
+  const typed = parseFloat(input.value.replace(",", "."));
+  if (!written || !(typed > 0)) return;
+  const factor = toSourceUnit(typed, unit, written.unit) / written.value;
+  if (factor <= 20) setFactor(factor);
+}
 
 $("dose").addEventListener("input", () => {
-  const input = $<HTMLInputElement>("dose");
-  state.doseText = input.value;
-  const { recipe } = check(source());
-  const dose = recipe.header?.dose;
-  const typed = parseFloat(input.value.replace(",", "."));
-  if (!dose || !(typed > 0)) return;
-
-  const shownUnit = $("dose-unit").textContent ?? dose.unit;
-  state.factor = toSourceDose(typed, shownUnit, dose.unit) / dose.amount.value;
-  refresh();
+  const dose = check(source()).recipe.header?.dose;
+  scaleTo($("dose"), $("dose-unit").textContent ?? "", dose && { value: dose.amount.value, unit: dose.unit });
 });
-$("dose").addEventListener("blur", () => {
-  state.doseText = undefined;
-  refresh();
+$("water").addEventListener("input", () => {
+  const water = totalWater(check(source()).recipe);
+  scaleTo($("water"), $("water-unit").textContent ?? "", water && { value: water.low, unit: water.unit });
 });
+for (const id of ["dose", "water"]) {
+  // Leaving a field shows the amount as the card does, rounded
+  $(id).addEventListener("blur", () => refresh());
+  $(id).addEventListener("keydown", (event) => {
+    if (event.key === "Enter") openMenu(undefined);
+  });
+}
 
 // Menus: dropdowns on wide screens, sheets on narrow ones
 
@@ -487,7 +493,6 @@ function load(text: string, file: string) {
   state.factor = 1;
   state.weight = undefined;
   state.temp = undefined;
-  state.doseText = undefined;
   replace(text);
 }
 
