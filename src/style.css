@@ -228,6 +228,11 @@ button {
 .spacer {
   flex: 1;
 }
+@media (max-width: 1000px) {
+  .brand span {
+    display: none;
+  }
+}
 
 .btn,
 .btn-ghost,
@@ -300,7 +305,54 @@ button {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* --code and --recipe are set by the gutter, as fr */
+  grid-template-columns: minmax(0, var(--code, 1fr)) 1px minmax(0, var(--recipe, 1fr));
+}
+
+/* The line between the panes, wider to grab than to see */
+.gutter {
+  position: relative;
+  z-index: 2;
+  background: var(--rule);
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.gutter::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+}
+.gutter:hover,
+.gutter:focus-visible,
+.gutter.dragging {
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.resizing,
+.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* Code only, or recipe only: the other pane and the gutter go */
+@media (min-width: 861px) {
+  .panes[data-layout="code"],
+  .panes[data-layout="recipe"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panes[data-layout="code"] .recipe-pane,
+  .panes[data-layout="code"] .gutter,
+  .panes[data-layout="recipe"] .code-pane,
+  .panes[data-layout="recipe"] .gutter {
+    display: none;
+  }
+}
+
+.topbar .layout button {
+  min-width: 0;
+  height: 30px;
+  font-family: var(--sans);
 }
 
 .pane {
@@ -311,7 +363,6 @@ button {
 }
 .code-pane {
   background: var(--panel);
-  border-right: 1px solid var(--rule);
 }
 
 .pane-head {
@@ -653,6 +704,7 @@ button {
 }
 .units {
   display: flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -678,28 +730,6 @@ button {
   opacity: 0.5;
 }
 
-/* A narrow recipe pane (a laptop window, under ~1400px) can't hold every tool on one line:
-   they wrap, and the 'Scale' label goes. The mobile layout below still wins under 860px */
-.recipe-pane {
-  container: recipe / inline-size;
-}
-@container recipe (max-width: 760px) {
-  .recipe-tools {
-    height: auto;
-    min-height: 44px;
-    padding-block: 8px;
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .recipe-tools .tools {
-    flex-wrap: wrap;
-    gap: 8px 12px;
-  }
-  .recipe-tools .desktop-only,
-  .recipe-tools .divider {
-    display: none;
-  }
-}
 
 /* Recipe */
 
@@ -896,12 +926,87 @@ button {
 }
 
 .customize-menu {
-  top: 108px;
-  left: calc(50% + 12px);
   width: 340px;
   padding: 18px;
   gap: 18px;
 }
+/* Scale: a button that opens a short menu, the last line to type any factor */
+.scale-button {
+  height: 30px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 13px;
+}
+.scale-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.scale-button .muted {
+  font-weight: 400;
+}
+.scale-menu {
+  width: 200px;
+}
+.scale-list {
+  display: flex;
+  flex-direction: column;
+}
+.scale-list button {
+  text-align: left;
+  border: 0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: transparent;
+  font: 500 14px var(--mono);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scale-list button:hover {
+  background: var(--hover);
+}
+.scale-list button.on {
+  background: var(--on-bg);
+  color: var(--on-fg);
+}
+.scale-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The recipe tools stay on one line: in a narrow pane, the labels go first */
+.recipe-pane {
+  container: recipe / inline-size;
+}
+@media (min-width: 861px) {
+  @container recipe (max-width: 620px) {
+    .recipe-tools {
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .recipe-tools .tools {
+      gap: 8px;
+    }
+    .recipe-tools .dose-label,
+    .scale-button .muted {
+      display: none;
+    }
+    .customize {
+      margin-left: 0;
+      font-size: 0;
+      gap: 0;
+    }
+    .recipe-tools .segmented button {
+      min-width: 34px;
+      padding: 0 7px;
+    }
+  }
+}
+
 .custom-section {
   display: flex;
   flex-direction: column;
@@ -1199,6 +1304,9 @@ button {
   .panes {
     display: block;
     overflow: auto;
+  }
+  .gutter {
+    display: none;
   }
   .panes[data-tab="code"] .recipe-pane,
   .panes[data-tab="recipe"] .code-pane {

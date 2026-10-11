@@ -45,7 +45,7 @@ const state = {
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
   doseText: undefined as string | undefined, // The dose being typed, kept as is until it changes
-  menu: undefined as "examples" | "share" | "customize" | undefined,
+  menu: undefined as "examples" | "share" | "customize" | "scale" | undefined,
 };
 
 // A shared link carries the recipe and the card's style: '#src=…&t=roaster&a=berry'
@@ -111,6 +111,85 @@ function showTab(tab: "code" | "recipe") {
 }
 $("tab-code").addEventListener("click", () => showTab("code"));
 $("tab-recipe").addEventListener("click", () => showTab("recipe"));
+
+// Layout, on wide screens: the code, the recipe, or both with a gutter between them
+
+type Layout = "code" | "split" | "recipe";
+const LAYOUTS: readonly Layout[] = ["code", "split", "recipe"];
+const panes = $("editor").closest<HTMLElement>(".panes")!;
+const gutter = $("gutter");
+
+function setLayout(layout: Layout) {
+  panes.dataset.layout = layout;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#layout button")) {
+    button.classList.toggle("on", button.dataset.layout === layout);
+  }
+  storage.set("layout", layout);
+}
+
+/// The narrowest each pane may get: the recipe's tools must fit on their line
+const MIN_CODE = 280;
+const MIN_RECIPE = 440;
+
+/// The code pane's share of the width, in percent: 20 to 80, and never below the panes' minimums
+let split = 50;
+function setSplit(percent: number, save = false) {
+  const width = panes.getBoundingClientRect().width || window.innerWidth;
+  const low = Math.max(20, (MIN_CODE / width) * 100);
+  const high = Math.max(low, Math.min(80, 100 - (MIN_RECIPE / width) * 100));
+  gutter.setAttribute("aria-valuemin", String(Math.ceil(low)));
+  gutter.setAttribute("aria-valuemax", String(Math.floor(high)));
+  split = Math.round(Math.min(high, Math.max(low, percent)));
+  panes.style.setProperty("--code", `${split}fr`);
+  panes.style.setProperty("--recipe", `${100 - split}fr`);
+  gutter.setAttribute("aria-valuenow", String(split));
+  if (save) storage.set("split", String(split));
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("#layout button")) {
+  button.addEventListener("click", () => setLayout(button.dataset.layout as Layout));
+}
+
+gutter.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  gutter.setPointerCapture(event.pointerId);
+  gutter.classList.add("dragging");
+  document.documentElement.classList.add("resizing");
+});
+gutter.addEventListener("pointermove", (event) => {
+  if (!gutter.hasPointerCapture(event.pointerId)) return;
+  const { left, width } = panes.getBoundingClientRect();
+  setSplit(((event.clientX - left) / width) * 100);
+});
+const endDrag = (event: PointerEvent) => {
+  if (!gutter.hasPointerCapture(event.pointerId)) return;
+  gutter.releasePointerCapture(event.pointerId);
+  gutter.classList.remove("dragging");
+  document.documentElement.classList.remove("resizing");
+  setSplit(split, true);
+  wanted = split;
+};
+gutter.addEventListener("pointerup", endDrag);
+gutter.addEventListener("pointercancel", endDrag);
+gutter.addEventListener("dblclick", () => {
+  setSplit(50, true);
+  wanted = split;
+});
+gutter.addEventListener("keydown", (event) => {
+  const keys: Record<string, number> = { ArrowLeft: split - 5, ArrowRight: split + 5, Home: 20, End: 80 };
+  const next = keys[event.key];
+  if (next === undefined) return;
+  event.preventDefault();
+  setSplit(next, true);
+  wanted = split;
+});
+
+const savedLayout = storage.get("layout") as Layout | null;
+setLayout(savedLayout && LAYOUTS.includes(savedLayout) ? savedLayout : "split");
+/// What the reader chose, applied again when the window changes; the minimums may move it
+let wanted = Number(storage.get("split")) || 50;
+setSplit(wanted);
+window.addEventListener("resize", () => setSplit(wanted));
 
 /// Select the word a diagnostic points at
 function jumpTo(d: Diagnostic) {
@@ -265,21 +344,24 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
   }
   $("dose-unit").textContent = shownDose?.unit ?? "g";
 
-  segmented(
-    "scales",
-    [
-      ["0.5", "½×", Math.abs(state.factor - 0.5) < 1e-6],
-      ["1", "1×", Math.abs(state.factor - 1) < 1e-6],
-      ["1.5", "1.5×", Math.abs(state.factor - 1.5) < 1e-6],
-      ["2", "2×", Math.abs(state.factor - 2) < 1e-6],
-    ],
-    (value) => {
-      state.factor = Number(value);
-      state.doseText = undefined;
-      refresh();
-    },
-    !canScale,
+  // Scale: a button showing the factor, and its menu of usual factors
+  $<HTMLButtonElement>("scale-button").disabled = !canScale;
+  $("scale-value").textContent = factorLabel(state.factor);
+  $("scales").replaceChildren(
+    ...SCALES.map(([value, label]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.classList.toggle("on", Math.abs(state.factor - value) < 1e-6);
+      button.addEventListener("click", () => {
+        setFactor(value);
+        openMenu(undefined);
+      });
+      return button;
+    }),
   );
+  const custom = $<HTMLInputElement>("scale-input");
+  if (document.activeElement !== custom) custom.value = String(round(state.factor));
 
   // Without a choice, the units are the author's: the dose's for the weight, the first temperature's
   const weight = state.weight ?? dose?.unit;
@@ -313,6 +395,34 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
   );
 }
 
+/// The usual factors of the scale menu; any other is typed on its last line
+const SCALES: readonly [number, string][] = [
+  [0.5, "½×"],
+  [1, "1×"],
+  [1.5, "1.5×"],
+  [2, "2×"],
+];
+
+/// Two decimals at most: 1.333… -> 1.33
+const round = (n: number) => Math.round(n * 100) / 100;
+
+/// 0.5 -> '½×', 1.25 -> '1.25×'
+const factorLabel = (factor: number) => SCALES.find(([value]) => Math.abs(value - factor) < 1e-6)?.[1] ?? `${round(factor)}×`;
+
+function setFactor(factor: number) {
+  state.factor = factor;
+  state.doseText = undefined;
+  refresh();
+}
+
+$("scale-input").addEventListener("input", () => {
+  const typed = parseFloat($<HTMLInputElement>("scale-input").value.replace(",", "."));
+  if (typed > 0 && typed <= 20) setFactor(typed);
+});
+$("scale-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") openMenu(undefined);
+});
+
 $("dose").addEventListener("input", () => {
   const input = $<HTMLInputElement>("dose");
   state.doseText = input.value;
@@ -332,13 +442,31 @@ $("dose").addEventListener("blur", () => {
 
 // Menus: dropdowns on wide screens, sheets on narrow ones
 
+/// The menus that open under their button on wide screens, wherever the gutter puts it
+const ANCHORED = { customize: "[data-action=customize]", scale: "#scale-button" } as const;
+const wide = window.matchMedia("(min-width: 861px)");
+
 function openMenu(menu: typeof state.menu) {
   state.menu = state.menu === menu ? undefined : menu;
   $("examples-menu").hidden = state.menu !== "examples";
   $("share-menu").hidden = state.menu !== "share";
   $("customize-menu").hidden = state.menu !== "customize";
+  $("scale-menu").hidden = state.menu !== "scale";
   $("scrim").hidden = !state.menu;
   if (state.menu === "share") $("share-url").textContent = link();
+
+  for (const [name, selector] of Object.entries(ANCHORED)) {
+    const el = $(`${name}-menu`);
+    if (state.menu !== name || !wide.matches) {
+      el.style.removeProperty("top");
+      el.style.removeProperty("left");
+      continue;
+    }
+    const button = document.querySelector(selector)!.getBoundingClientRect();
+    const width = el.getBoundingClientRect().width;
+    el.style.top = `${button.bottom + 6}px`;
+    el.style.left = `${Math.max(8, Math.min(button.left, window.innerWidth - width - 8))}px`;
+  }
 }
 $("scrim").addEventListener("click", () => openMenu(undefined));
 document.addEventListener("keydown", (event) => {
@@ -348,7 +476,7 @@ document.addEventListener("keydown", (event) => {
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
   button.addEventListener("click", () => {
     const action = button.dataset.action;
-    if (action === "examples" || action === "share" || action === "customize") openMenu(action);
+    if (action === "examples" || action === "share" || action === "customize" || action === "scale") openMenu(action);
     if (action === "prompt") copyPrompt();
   });
 }
