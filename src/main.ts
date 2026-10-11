@@ -1,4 +1,5 @@
 import { EditorView, basicSetup } from "codemirror";
+import { Compartment } from "@codemirror/state";
 import type { Diagnostic, Recipe } from "brewlang";
 import { check, toJson, totalWater } from "brewlang";
 import type { RenderResult } from "@brewlang/render";
@@ -72,11 +73,17 @@ if (initial === null) {
   state.file = DEFAULT_FILE;
 }
 
+/// Narrow screens: tabs, sheets, wrapped lines and the key bar
+const narrow = window.matchMedia("(max-width: 860px)");
+const wrapping = new Compartment();
+const wrap = () => (narrow.matches ? EditorView.lineWrapping : []);
+
 const view = new EditorView({
   doc: initial,
   parent: $("editor"),
   extensions: [
     basicSetup,
+    wrapping.of(wrap()),
     brewHighlight,
     brewAutocomplete,
     brewLint,
@@ -88,6 +95,34 @@ const view = new EditorView({
 });
 
 const source = () => view.state.doc.toString();
+
+// The key bar: on a phone, the characters Brewlang uses most, above the keyboard while the editor has focus
+
+const keybar = $("keybar");
+
+/// Keep the bar on top of the keyboard: the visual viewport shrinks when the keyboard opens
+function placeKeybar() {
+  const viewport = window.visualViewport;
+  const covered = viewport ? window.innerHeight - viewport.height - viewport.offsetTop : 0;
+  keybar.style.bottom = `${Math.max(0, covered)}px`;
+}
+window.visualViewport?.addEventListener("resize", placeKeybar);
+window.visualViewport?.addEventListener("scroll", placeKeybar);
+
+view.contentDOM.addEventListener("focus", () => {
+  keybar.hidden = !narrow.matches;
+  placeKeybar();
+});
+view.contentDOM.addEventListener("blur", () => (keybar.hidden = true));
+
+for (const key of keybar.querySelectorAll<HTMLButtonElement>("button")) {
+  // Tapping a key must not take the focus from the editor, or the keyboard would close
+  key.addEventListener("pointerdown", (event) => event.preventDefault());
+  key.addEventListener("click", () => {
+    view.dispatch(view.state.replaceSelection(key.dataset.insert ?? ""));
+    view.focus();
+  });
+}
 const replace = (text: string) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
 
 // Toast
@@ -110,6 +145,27 @@ function showTab(tab: "code" | "recipe") {
 }
 $("tab-code").addEventListener("click", () => showTab("code"));
 $("tab-recipe").addEventListener("click", () => showTab("recipe"));
+
+// The problems strip, on narrow screens: the status always, the list when opened
+
+const problemsToggle = $("problems-toggle");
+problemsToggle.addEventListener("click", () => {
+  if (!narrow.matches) return;
+  const open = problemsToggle.closest(".problems")!.classList.toggle("open");
+  problemsToggle.setAttribute("aria-expanded", String(open));
+});
+
+// Narrow screens: the units move into the scale sheet, the editor wraps its lines
+
+const units = document.querySelector<HTMLElement>(".units")!;
+const unitsHome = units.parentElement!;
+function placeForScreen() {
+  (narrow.matches ? $("sheet-units") : unitsHome).append(units);
+  view.dispatch({ effects: wrapping.reconfigure(wrap()) });
+  if (!narrow.matches) keybar.hidden = true;
+  refresh();
+}
+narrow.addEventListener("change", placeForScreen);
 
 // Layout, on wide screens: the code, the recipe, or both with a gutter between them
 
@@ -222,9 +278,11 @@ function renderProblems(diagnostics: Diagnostic[]) {
   if (counts.warning) parts.push(plural(counts.warning, "warning"));
   if (counts.suggestion) parts.push(plural(counts.suggestion, "suggestion"));
 
-  const status = $("status");
-  status.textContent = parts.length ? parts.join(" · ") : "Valid recipe";
-  status.dataset.severity = counts.error ? "error" : counts.warning ? "warning" : counts.suggestion ? "suggestion" : "ok";
+  // The status shows in the code pane's head, and on narrow screens in the problems strip
+  for (const status of [$("status"), $("problems-status")]) {
+    status.textContent = parts.length ? parts.join(" · ") : "Valid recipe";
+    status.dataset.severity = counts.error ? "error" : counts.warning ? "warning" : counts.suggestion ? "suggestion" : "ok";
+  }
 
   $("count").textContent = diagnostics.length ? String(diagnostics.length) : "";
   const badge = $("badge");
@@ -355,8 +413,9 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
   if (document.activeElement !== waterInput) waterInput.value = water && !waterInput.disabled ? String(water.low) : "";
   $("water-unit").textContent = water?.unit ?? "g";
 
-  // Scale: a button showing the factor, and its menu of usual factors
-  $<HTMLButtonElement>("scale-button").disabled = !canScale;
+  // Scale: a button showing the factor, and its menu of usual factors. On narrow screens the menu also
+  // holds the units and Customize, so the button stays usable when scaling is not
+  $<HTMLButtonElement>("scale-button").disabled = !canScale && !narrow.matches;
   $("scale-value").textContent = factorLabel(state.factor);
   $("scales").replaceChildren(
     ...SCALES.map(([value, label]) => {
@@ -364,6 +423,7 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
       button.type = "button";
       button.textContent = label;
       button.classList.toggle("on", Math.abs(state.factor - value) < 1e-6);
+      button.disabled = !canScale;
       button.addEventListener("click", () => {
         setFactor(value);
         openMenu(undefined);
@@ -401,6 +461,9 @@ function renderTools(recipe: Recipe, shown: Recipe, ok: boolean) {
     },
     !ok || !writtenTemp,
   );
+
+  // On narrow screens, the scale button sums up what the card shows: '1× · g · °C'
+  $("scale-summary").textContent = [weight, temp].filter(Boolean).map((unit) => ` · ${unit}`).join("");
 }
 
 /// The usual factors of the scale menu; under them, the coffee or the water to scale to
@@ -706,4 +769,4 @@ function refresh() {
   renderRecipePane(recipe, diagnostics);
 }
 
-refresh();
+placeForScreen(); // Puts the units where they belong, then the first refresh
