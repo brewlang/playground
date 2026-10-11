@@ -75,8 +75,6 @@
           <div class="pane-head recipe-tools">
             <button type="button" class="btn-ghost customize" data-action="customize" title="Customize the card">Customize</button>
             <div class="tools">
-              <label class="dose"><span class="dose-label">Dose</span><span class="field"><input id="dose" inputmode="decimal" aria-label="Dose" autocomplete="off" /><span id="dose-unit"></span></span></label>
-              <span class="divider"></span>
               <button type="button" id="scale-button" class="btn scale-button" data-action="scale" aria-haspopup="true">
                 <span class="muted">Scale</span><strong id="scale-value" class="mono">1×</strong><span class="caret">▼</span>
               </button>
@@ -141,8 +139,12 @@
         <div id="scales" class="scale-list"></div>
         <div class="menu-rule"></div>
         <label class="scale-custom">
-          <span>Custom</span>
-          <span class="field"><input id="scale-input" inputmode="decimal" aria-label="Custom scale" autocomplete="off" /><span>×</span></span>
+          <span>Coffee</span>
+          <span class="field"><input id="dose" inputmode="decimal" aria-label="Coffee" autocomplete="off" /><span id="dose-unit"></span></span>
+        </label>
+        <label class="scale-custom">
+          <span>Water</span>
+          <span class="field"><input id="water" inputmode="decimal" aria-label="Water" autocomplete="off" /><span id="water-unit"></span></span>
         </label>
       </div>
 
