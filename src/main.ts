@@ -735,7 +735,7 @@ function renderCustomize() {
   picker.title = "Any color";
   picker.innerHTML = `<input type="color" aria-label="Any accent color" />`;
   const input = picker.querySelector("input")!;
-  input.value = custom ?? "#a37343";
+  input.value = custom ?? "#d42e3b";
   if (custom) picker.style.setProperty("--swatch", custom);
   input.addEventListener("input", () => {
     setStyle({ ...style, accent: input.value }, false);

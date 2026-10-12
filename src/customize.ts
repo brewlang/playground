@@ -2,7 +2,7 @@
 // 'auto' sets nothing, so the card follows the playground's own light or dark theme
 
 export type ThemeName = "auto" | "paper" | "night" | "roaster";
-export type FontName = "serif" | "sans" | "mono";
+export type FontName = "sans" | "serif" | "mono";
 
 export interface CardStyle {
   theme: ThemeName;
@@ -10,9 +10,9 @@ export interface CardStyle {
   font: FontName;
 }
 
-/// The accent a new card gets: caramel, #a37343
-export const DEFAULT_ACCENT = "caramel";
-export const DEFAULT_STYLE: CardStyle = { theme: "auto", accent: DEFAULT_ACCENT, font: "serif" };
+/// The accent a new card gets: cherry, #d42e3b, the site's red; the title in the site's font
+export const DEFAULT_ACCENT = "cherry";
+export const DEFAULT_STYLE: CardStyle = { theme: "auto", accent: DEFAULT_ACCENT, font: "sans" };
 
 /// Every color of a card, as brew.css names them without the '--brew-' prefix
 type Palette = Record<"bg" | "ink" | "muted" | "faint" | "rule" | "rule-soft" | "soft" | "accent" | "qual" | "qual-line", string>;
@@ -66,6 +66,7 @@ export const THEMES: Record<Exclude<ThemeName, "auto">, { label: string; palette
 };
 
 export const ACCENTS: Record<string, { label: string; color: string }> = {
+  cherry: { label: "Cherry", color: "#d42e3b" },
   caramel: { label: "Caramel", color: "#a37343" },
   copper: { label: "Copper", color: "oklch(0.6 0.15 40)" },
   berry: { label: "Berry", color: "oklch(0.55 0.17 0)" },
@@ -75,9 +76,9 @@ export const ACCENTS: Record<string, { label: string; color: string }> = {
 };
 
 export const FONTS: Record<FontName, { label: string; family: string }> = {
+  sans: { label: "Sans", family: '"Bricolage Grotesque", system-ui, sans-serif' },
   serif: { label: "Serif", family: '"Newsreader", Georgia, serif' },
-  sans: { label: "Sans", family: '"Instrument Sans", system-ui, sans-serif' },
-  mono: { label: "Mono", family: '"IBM Plex Mono", ui-monospace, monospace' },
+  mono: { label: "Mono", family: '"JetBrains Mono", ui-monospace, monospace' },
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -94,7 +95,7 @@ export function variables(style: CardStyle): Record<string, string> {
   }
   const accent = accentColor(style.accent);
   if (accent) vars["--brew-accent"] = accent;
-  if (style.font !== "serif") vars["--brew-font-display"] = FONTS[style.font].family;
+  if (style.font !== DEFAULT_STYLE.font) vars["--brew-font-display"] = FONTS[style.font].family;
   return vars;
 }
 
@@ -138,9 +139,8 @@ export function fromParams(params: URLSearchParams): CardStyle {
   return style;
 }
 
-// The editor's colors and the Share button follow the card's accent: the brewer takes the accent itself, and the other roles
-// keep their lightness and chroma, their hue the same distance from the accent's as in the original
-// palette, built around copper (38)
+// The brewer in the editor and the Share button follow the card's accent; the other roles keep the
+// site's fixed colors (style.css), so a recipe reads the same here, on the home page and in the docs
 
 /// '#rrggbb' -> its OKLCH lightness, chroma and hue
 function hexOklch(hex: string): [number, number, number] {
@@ -168,7 +168,7 @@ function colorOklch(color: string): [number, number, number] | undefined {
 }
 
 /// The playground's own accent, the card's in 'auto' without a chosen accent
-const PLAYGROUND_ACCENT = "oklch(0.56 0.15 38)";
+const PLAYGROUND_ACCENT = "#d42e3b";
 
 /** The color the editor's colors follow, as OKLCH: the chosen accent, else the theme's. */
 export function accentOklch(style: CardStyle): [number, number, number] {
@@ -178,30 +178,16 @@ export function accentOklch(style: CardStyle): [number, number, number] {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-/// The colored roles: lightness, chroma and hue offset from the accent, in light then dark
-const ROLES: Record<string, [[number, number, number], [number, number, number]]> = {
-  brewer: [[0.56, 0.15, 0], [0.76, 0.13, 7]],
-  temp: [[0.52, 0.12, 32], [0.82, 0.11, 42]],
-  time: [[0.47, 0.11, 212], [0.78, 0.09, 212]],
-  qual: [[0.45, 0.1, 117], [0.8, 0.1, 117]],
-  action: [[0.47, 0.13, 282], [0.78, 0.11, 282]],
-};
-
-/** The CSS that sets the editor's --syn-* colors and the Share button's around an accent, for the light and the dark theme, like style.css. */
+/** The CSS that sets the editor's brewer color and the Share button's from an accent, for the light and the dark theme, like style.css. */
 export function accentCss([accentL, accentC, hue]: [number, number, number]): string {
   const block = (dark: 0 | 1) =>
     [
       // Share: the accent, dark enough for white text in light, light enough for dark text in dark
       `--primary-bg: oklch(${(dark ? clamp(accentL, 0.7, 0.82) : clamp(accentL, 0.42, 0.55)).toFixed(3)} ${accentC.toFixed(3)} ${hue.toFixed(1)});`,
       `--primary-fg: ${dark ? "oklch(0.18 0 0)" : "#fff"};`,
-    ].concat(Object.entries(ROLES)
-      .map(([role, shades]) => {
-        let [l, c, offset] = shades[dark];
-        // The brewer is the accent, its lightness kept readable on the editor's background
-        if (role === "brewer") [l, c, offset] = [dark ? clamp(accentL, 0.7, 0.82) : clamp(accentL, 0.45, 0.62), accentC, 0];
-        return `--syn-${role}: oklch(${l.toFixed(3)} ${c.toFixed(3)} ${((hue + offset) % 360).toFixed(1)});`;
-      }))
-      .join(" ");
+      // The brewer is the accent, its lightness kept readable on the editor's background
+      `--syn-brewer: oklch(${(dark ? clamp(accentL, 0.66, 0.78) : clamp(accentL, 0.42, 0.52)).toFixed(3)} ${accentC.toFixed(3)} ${hue.toFixed(1)});`,
+    ].join(" ");
   return [
     `:root { ${block(0)} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${block(1)} } }`,
