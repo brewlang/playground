@@ -10,7 +10,7 @@ import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
-import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, applyStyle, css, fromParams, toParams } from "./customize";
+import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentHue, applyStyle, css, fromParams, syntaxCss, toParams } from "./customize";
 import { decode, downloadPng, downloadText, shareUrl } from "./share";
 
 // The real recipes of the brewlang repo, keyed by file name
@@ -693,9 +693,14 @@ function choices(id: string, items: [string, string, boolean][], pick: (value: s
   );
 }
 
+/// The editor's colors, rebuilt around the card's accent; this style comes after style.css, so it wins
+const syntaxStyle = document.head.appendChild(document.createElement("style"));
+const colorEditor = () => (syntaxStyle.textContent = syntaxCss(accentHue(style)));
+
 function setStyle(next: CardStyle) {
   style = next;
   storage.set("style", toParams(style).toString());
+  colorEditor();
   renderCustomize();
   refresh();
 }
@@ -729,7 +734,7 @@ function renderCustomize() {
   picker.title = "Any color";
   picker.innerHTML = `<input type="color" aria-label="Any accent color" />`;
   const input = picker.querySelector("input")!;
-  input.value = custom ?? "#b5542e";
+  input.value = custom ?? "#5800d4";
   if (custom) picker.style.setProperty("--swatch", custom);
   input.addEventListener("input", () => setStyle({ ...style, accent: input.value }));
   $("custom-accents").append(picker);
@@ -747,6 +752,7 @@ $("copy-css").addEventListener("click", async () => {
 });
 $("reset-style").addEventListener("click", () => setStyle({ ...DEFAULT_STYLE }));
 
+colorEditor();
 renderCustomize();
 
 // Theme: the system's until the reader picks one
