@@ -138,7 +138,7 @@ export function fromParams(params: URLSearchParams): CardStyle {
   return style;
 }
 
-// The editor's colors follow the card's accent: the brewer takes the accent itself, and the other roles
+// The editor's colors and the Share button follow the card's accent: the brewer takes the accent itself, and the other roles
 // keep their lightness and chroma, their hue the same distance from the accent's as in the original
 // palette, built around copper (38)
 
@@ -187,16 +187,20 @@ const ROLES: Record<string, [[number, number, number], [number, number, number]]
   action: [[0.47, 0.13, 282], [0.78, 0.11, 282]],
 };
 
-/** The CSS that sets the editor's --syn-* colors around an accent, for the light and the dark theme, like style.css. */
-export function syntaxCss([accentL, accentC, hue]: [number, number, number]): string {
+/** The CSS that sets the editor's --syn-* colors and the Share button's around an accent, for the light and the dark theme, like style.css. */
+export function accentCss([accentL, accentC, hue]: [number, number, number]): string {
   const block = (dark: 0 | 1) =>
-    Object.entries(ROLES)
+    [
+      // Share: the accent, dark enough for white text in light, light enough for dark text in dark
+      `--primary-bg: oklch(${(dark ? clamp(accentL, 0.7, 0.82) : clamp(accentL, 0.42, 0.55)).toFixed(3)} ${accentC.toFixed(3)} ${hue.toFixed(1)});`,
+      `--primary-fg: ${dark ? "oklch(0.18 0 0)" : "#fff"};`,
+    ].concat(Object.entries(ROLES)
       .map(([role, shades]) => {
         let [l, c, offset] = shades[dark];
         // The brewer is the accent, its lightness kept readable on the editor's background
         if (role === "brewer") [l, c, offset] = [dark ? clamp(accentL, 0.7, 0.82) : clamp(accentL, 0.45, 0.62), accentC, 0];
         return `--syn-${role}: oklch(${l.toFixed(3)} ${c.toFixed(3)} ${((hue + offset) % 360).toFixed(1)});`;
-      })
+      }))
       .join(" ");
   return [
     `:root { ${block(0)} }`,

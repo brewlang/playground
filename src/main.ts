@@ -10,7 +10,7 @@ import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
-import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, syntaxCss, toParams } from "./customize";
+import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams } from "./customize";
 import { decode, downloadPng, downloadText, shareUrl } from "./share";
 
 // The real recipes of the brewlang repo, keyed by file name
@@ -693,9 +693,9 @@ function choices(id: string, items: [string, string, boolean][], pick: (value: s
   );
 }
 
-/// The editor's colors, rebuilt around the card's accent; this style comes after style.css, so it wins
+/// The editor's colors and the Share button, rebuilt around the card's accent; this style comes after style.css, so it wins
 const syntaxStyle = document.head.appendChild(document.createElement("style"));
-const colorEditor = () => (syntaxStyle.textContent = syntaxCss(accentOklch(style)));
+const colorEditor = () => (syntaxStyle.textContent = accentCss(accentOklch(style)));
 
 /// `menu: false` leaves the Customize menu as it is, so an open color picker stays attached
 function setStyle(next: CardStyle, menu = true) {
