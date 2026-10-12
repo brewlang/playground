@@ -10,8 +10,8 @@ export interface CardStyle {
   font: FontName;
 }
 
-/// The accent a new card gets: violet, #5800d4
-export const DEFAULT_ACCENT = "violet";
+/// The accent a new card gets: caramel, #a37343
+export const DEFAULT_ACCENT = "caramel";
 export const DEFAULT_STYLE: CardStyle = { theme: "auto", accent: DEFAULT_ACCENT, font: "serif" };
 
 /// Every color of a card, as brew.css names them without the '--brew-' prefix
@@ -66,7 +66,7 @@ export const THEMES: Record<Exclude<ThemeName, "auto">, { label: string; palette
 };
 
 export const ACCENTS: Record<string, { label: string; color: string }> = {
-  violet: { label: "Violet", color: "#5800d4" },
+  caramel: { label: "Caramel", color: "#a37343" },
   copper: { label: "Copper", color: "oklch(0.6 0.15 40)" },
   berry: { label: "Berry", color: "oklch(0.55 0.17 0)" },
   cobalt: { label: "Cobalt", color: "oklch(0.52 0.15 260)" },
@@ -138,11 +138,12 @@ export function fromParams(params: URLSearchParams): CardStyle {
   return style;
 }
 
-// The editor's colors follow the card's accent: each colored role keeps its lightness and chroma, and
-// its hue keeps the same distance from the accent's as in the original palette, built around copper (38)
+// The editor's colors follow the card's accent: the brewer takes the accent itself, and the other roles
+// keep their lightness and chroma, their hue the same distance from the accent's as in the original
+// palette, built around copper (38)
 
-/// '#rrggbb' -> its OKLCH hue, in degrees
-function hexHue(hex: string): number {
+/// '#rrggbb' -> its OKLCH lightness, chroma and hue
+function hexOklch(hex: string): [number, number, number] {
   const [r, g, b] = [1, 3, 5].map((i) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -152,24 +153,30 @@ function hexHue(hex: string): number {
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
   const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
   const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
-  return ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360;
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    Math.hypot(a, bb),
+    ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360,
+  ];
 }
 
-/// The hue of a CSS color written 'oklch(L C H)' or '#rrggbb'
-function colorHue(color: string): number | undefined {
-  if (HEX.test(color)) return hexHue(color);
-  const match = /oklch\(\s*[\d.]+\s+[\d.]+\s+([\d.]+)/.exec(color);
-  return match ? Number(match[1]) : undefined;
+/// The lightness, chroma and hue of a CSS color written 'oklch(L C H)' or '#rrggbb'
+function colorOklch(color: string): [number, number, number] | undefined {
+  if (HEX.test(color)) return hexOklch(color);
+  const match = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(color);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : undefined;
 }
 
 /// The playground's own accent, the card's in 'auto' without a chosen accent
 const PLAYGROUND_ACCENT = "oklch(0.56 0.15 38)";
 
-/** The hue the editor's colors follow: the chosen accent, else the theme's. */
-export function accentHue(style: CardStyle): number {
+/** The color the editor's colors follow, as OKLCH: the chosen accent, else the theme's. */
+export function accentOklch(style: CardStyle): [number, number, number] {
   const color = accentColor(style.accent) ?? (style.theme === "auto" ? PLAYGROUND_ACCENT : THEMES[style.theme].palette.accent);
-  return colorHue(color) ?? 38;
+  return colorOklch(color) ?? [0.56, 0.15, 38];
 }
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /// The colored roles: lightness, chroma and hue offset from the accent, in light then dark
 const ROLES: Record<string, [[number, number, number], [number, number, number]]> = {
@@ -180,13 +187,15 @@ const ROLES: Record<string, [[number, number, number], [number, number, number]]
   action: [[0.47, 0.13, 282], [0.78, 0.11, 282]],
 };
 
-/** The CSS that sets the editor's --syn-* colors around a hue, for the light and the dark theme, like style.css. */
-export function syntaxCss(hue: number): string {
+/** The CSS that sets the editor's --syn-* colors around an accent, for the light and the dark theme, like style.css. */
+export function syntaxCss([accentL, accentC, hue]: [number, number, number]): string {
   const block = (dark: 0 | 1) =>
     Object.entries(ROLES)
       .map(([role, shades]) => {
-        const [l, c, offset] = shades[dark];
-        return `--syn-${role}: oklch(${l} ${c} ${((hue + offset) % 360).toFixed(1)});`;
+        let [l, c, offset] = shades[dark];
+        // The brewer is the accent, its lightness kept readable on the editor's background
+        if (role === "brewer") [l, c, offset] = [dark ? clamp(accentL, 0.7, 0.82) : clamp(accentL, 0.45, 0.62), accentC, 0];
+        return `--syn-${role}: oklch(${l.toFixed(3)} ${c.toFixed(3)} ${((hue + offset) % 360).toFixed(1)});`;
       })
       .join(" ");
   return [
