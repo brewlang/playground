@@ -8,6 +8,7 @@ export interface SnippetLook {
   bar: boolean; // The title bar: three dots and the file name
   numbers: boolean;
   format: Format;
+  solid: boolean; // A plain background instead of the gradient
 }
 
 /// The background swatches besides the accent and nothing; any other color comes from the picker
@@ -30,7 +31,7 @@ export const FORMATS: Record<Exclude<Format, "auto">, { label: string; width: nu
   wide: { label: "16:9", width: 1920, height: 1080 },
 };
 
-export const DEFAULT_LOOK: SnippetLook = { background: "accent", window: "auto", bar: true, numbers: false, format: "auto" };
+export const DEFAULT_LOOK: SnippetLook = { background: "accent", window: "auto", bar: true, numbers: false, format: "auto", solid: false };
 
 /** A look as short parameters, for storage: only what differs from the default. */
 export function lookToParams(look: SnippetLook): string {
@@ -40,6 +41,7 @@ export function lookToParams(look: SnippetLook): string {
   if (look.bar !== DEFAULT_LOOK.bar) params.set("bar", look.bar ? "1" : "0");
   if (look.numbers !== DEFAULT_LOOK.numbers) params.set("n", look.numbers ? "1" : "0");
   if (look.format !== DEFAULT_LOOK.format) params.set("f", look.format);
+  if (look.solid !== DEFAULT_LOOK.solid) params.set("s", look.solid ? "1" : "0");
   return params.toString();
 }
 
@@ -56,13 +58,14 @@ export function lookFromParams(text: string | null): SnippetLook {
   if (params.has("n")) look.numbers = params.get("n") === "1";
   const f = params.get("f");
   if (f && f in FORMATS) look.format = f as Format;
+  if (params.has("s")) look.solid = params.get("s") === "1";
   return look;
 }
 
 /** The code image as an element, to show or to save; `accent` is the card's, when it sets one, for the accent background. */
 export function snippet(code: string, file: string, look: SnippetLook, accent?: string): HTMLElement {
   const root = document.createElement("div");
-  root.className = `snippet${look.background === "none" ? " clear" : ""}`;
+  root.className = `snippet${look.background === "none" ? " clear" : look.solid ? " solid" : ""}`;
   if (look.window !== "auto") root.dataset.window = look.window;
   const color = look.background.startsWith("#") ? look.background : accent;
   if (color) root.style.setProperty("--snippet-accent", color);

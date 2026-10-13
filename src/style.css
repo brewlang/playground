@@ -1610,6 +1610,9 @@ button {
   flex: none;
   max-width: var(--snippet-max);
 }
+.snippet.solid {
+  background: var(--snippet-accent);
+}
 .snippet.clear {
   padding: 32px;
   background: none;
@@ -1684,9 +1687,13 @@ button {
 .code-preview {
   display: flex;
   justify-content: center;
+  align-items: flex-start; /* Never stretched to the last preview's height */
   overflow: hidden;
   border-radius: 6px;
   background: var(--soft);
+}
+.code-preview > .snippet {
+  flex: none; /* Its own size, measured before it is scaled down */
 }
 .code-preview.clear {
   background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;

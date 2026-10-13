@@ -680,7 +680,6 @@ function renderPreview() {
   fitSnippet(image);
   const scale = Math.min(1, preview.clientWidth / image.offsetWidth, 360 / image.offsetHeight);
   image.style.transform = `scale(${scale})`;
-  image.style.flex = "none";
   image.style.marginRight = `${-image.offsetWidth * (1 - scale)}px`; // The layout box shrinks with the picture, so it centers
   preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
 }
@@ -724,6 +723,15 @@ function renderCode() {
   });
   bgInput.addEventListener("change", () => renderCode());
   $("code-backgrounds").append(bgPicker);
+  choices(
+    "code-fills",
+    [
+      ["gradient", "Gradient", !look.solid],
+      ["solid", "Solid", look.solid],
+    ],
+    (value) => setLook({ ...look, solid: value === "solid" }),
+    (button) => (button.disabled = look.background === "none"),
+  );
   choices(
     "code-windows",
     [
