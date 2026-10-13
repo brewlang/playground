@@ -10,7 +10,7 @@ import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
-import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
+import { ACCENTS, DEFAULT_STYLE, FONTS, LAYOUT_LABELS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
 import type { CardLook } from "./cardshot";
 import { CARD_FORMATS, cardLookFromParams, cardLookToParams, cardRatio, cardShot, fitCard } from "./cardshot";
 import { decode, downloadSnapshot, downloadText, shareUrl } from "./share";
@@ -367,6 +367,7 @@ function renderRecipePane(recipe: Recipe, diagnostics: Diagnostic[]) {
     ...(state.weight && { weight: state.weight }),
     ...(state.temp && { temp: state.temp }),
     title: state.file.replace(/\.brew$/, ""),
+    layout: style.layout,
   });
   // Only failures: the scaling warning ("Amounts ×1.5, times unchanged") is left out
   for (const d of shown.notes) if (d.severity === "error") note(d.message);
@@ -657,7 +658,7 @@ let cardLook = cardLookFromParams(storage.get("card"));
 /// The card image, its style applied; undefined without a card to show
 function cardImage(): HTMLElement | undefined {
   if (!shown?.model) return undefined;
-  const image = cardShot(toHtml(shown.model, { signed: cardLook.signed }), cardLook, variables(style)["--brew-accent"]);
+  const image = cardShot(toHtml(shown.model, { signed: cardLook.signed, layout: style.layout }), cardLook, variables(style)["--brew-accent"]);
   applyStyle(image.querySelector(".brew-card"), style);
   return image;
 }
@@ -934,6 +935,11 @@ function setStyle(next: CardStyle, menu = true) {
 }
 
 function renderCustomize() {
+  choices(
+    "custom-layouts",
+    Object.entries(LAYOUT_LABELS).map(([key, label]): [string, string, boolean] => [key, label, style.layout === key]),
+    (value) => setStyle({ ...style, layout: value as CardStyle["layout"] }),
+  );
   choices(
     "custom-themes",
     [["auto", "Auto", style.theme === "auto"], ...Object.entries(THEMES).map(([key, t]): [string, string, boolean] => [key, t.label, style.theme === key])],

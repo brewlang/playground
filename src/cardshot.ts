@@ -17,8 +17,10 @@ export interface CardLook {
 
 export const DEFAULT_CARD_LOOK: CardLook = { format: "portrait", background: "card", solid: false, signed: true };
 
-/// The card's width in the image, the size its export styles are made for (style.css, under .card-shot)
+/// The card's width in the image: classic is laid out at 1080px with type made for it; the other layouts at
+/// 600px, zoomed 1.8 times (style.css, under .card-shot)
 const CARD_WIDTH = 1080;
+const LAYOUT_ZOOM = 1.8;
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -68,7 +70,8 @@ export function cardShot(html: string, look: CardLook, accent?: string): HTMLEle
     root.style.height = `${height}px`;
     // Filling the image, the card is as tall as the format at least, so the signature sits at the bottom
     const card = root.querySelector<HTMLElement>(".brew-card");
-    if (bare && card) card.style.minHeight = `${(CARD_WIDTH * height) / width}px`;
+    const zoom = card?.dataset.layout ? LAYOUT_ZOOM : 1;
+    if (bare && card) card.style.minHeight = `${(CARD_WIDTH * height) / width / zoom}px`;
   }
   return root;
 }
@@ -81,6 +84,8 @@ export function fitCard(root: HTMLElement) {
   const bare = root.classList.contains("bare");
   if (bare) root.style.backgroundColor = getComputedStyle(card).backgroundColor;
   const room = bare ? 0 : Math.min(root.clientWidth, root.clientHeight) * 0.08;
-  const scale = Math.min(1, (root.clientWidth - 2 * room) / card.offsetWidth, (root.clientHeight - 2 * room) / card.offsetHeight);
+  // Its size as drawn: offsetWidth would leave out a layout's zoom
+  const { width, height } = card.getBoundingClientRect();
+  const scale = Math.min(1, (root.clientWidth - 2 * room) / width, (root.clientHeight - 2 * room) / height);
   card.style.transform = `scale(${scale})`;
 }

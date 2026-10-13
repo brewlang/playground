@@ -1116,6 +1116,14 @@ button {
   flex: 1;
   font-size: 15px;
 }
+/* Five layouts: on two rows, three per row, so none is cut in a narrow menu */
+#custom-layouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+#custom-layouts button {
+  min-width: 0;
+}
 
 .custom-actions {
   display: flex;
@@ -1217,119 +1225,136 @@ button {
   transform-origin: top center;
 }
 .card-shot .brew-card {
-  width: 1080px;
   border: 0;
   border-radius: 0;
+}
+/* Classic: 1080px wide, with type made for the image */
+.card-shot .brew-card:not([data-layout]) {
+  width: 1080px;
   padding: 88px 88px 60px;
   gap: 0;
+}
+/* The other layouts: their own type, 600px wide and zoomed to 1080 (cardshot.ts knows the zoom) */
+.card-shot .brew-card[data-layout] {
+  width: 600px;
+  margin: 0;
+  zoom: 1.8;
+}
+.card-shot .brew-card[data-layout="receipt"] {
+  width: 440px;
+  max-width: none;
 }
 .card-shot:not(.bare) .brew-card {
   border-radius: 20px;
   box-shadow: 0 32px 80px -16px oklch(0 0 0 / 0.45);
 }
+.card-shot:not(.bare) .brew-card[data-layout] {
+  border-radius: 11px;
+  box-shadow: 0 18px 44px -9px oklch(0 0 0 / 0.45);
+}
 .card-shot.clear .brew-card {
   box-shadow: 0 12px 32px -8px oklch(0 0 0 / 0.35), 0 0 0 1px oklch(0 0 0 / 0.08);
 }
-.card-shot .brew-kicker {
+.card-shot .brew-card:not([data-layout]) .brew-kicker {
   font-size: 24px;
   letter-spacing: 0.12em;
 }
-.card-shot .brew-head {
+.card-shot .brew-card:not([data-layout]) .brew-head {
   gap: 14px;
 }
-.card-shot .brew-title {
+.card-shot .brew-card:not([data-layout]) .brew-title {
   font-size: 84px;
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
-.card-shot .brew-note {
+.card-shot .brew-card:not([data-layout]) .brew-note {
   margin: 10px 0 0;
   font-size: 26px;
 }
-.card-shot .brew-specs {
+.card-shot .brew-card:not([data-layout]) .brew-specs {
   margin-top: 48px;
   border-top-width: 2px;
 }
-.card-shot .brew-spec {
+.card-shot .brew-card:not([data-layout]) .brew-spec {
   padding: 22px 0 26px;
   gap: 10px;
 }
-.card-shot .brew-spec dt {
+.card-shot .brew-card:not([data-layout]) .brew-spec dt {
   font-size: 18px;
   letter-spacing: 0.1em;
 }
-.card-shot .brew-spec dd {
+.card-shot .brew-card:not([data-layout]) .brew-spec dd {
   font-size: 58px;
 }
-.card-shot .brew-extras {
+.card-shot .brew-card:not([data-layout]) .brew-extras {
   margin-top: 22px;
   gap: 10px 40px;
   font-size: 24px;
 }
-.card-shot .brew-prep {
+.card-shot .brew-card:not([data-layout]) .brew-prep {
   margin-top: 28px;
   padding: 18px 24px;
   border-radius: 6px;
 }
-.card-shot .brew-prep h3 {
+.card-shot .brew-card:not([data-layout]) .brew-prep h3 {
   font-size: 27px;
 }
-.card-shot .brew-prep li {
+.card-shot .brew-card:not([data-layout]) .brew-prep li {
   font-size: 24px;
 }
-.card-shot .brew-steps {
+.card-shot .brew-card:not([data-layout]) .brew-steps {
   margin-top: 16px;
 }
-.card-shot .brew-step {
+.card-shot .brew-card:not([data-layout]) .brew-step {
   grid-template-columns: 110px minmax(0, 1fr) 200px;
   gap: 24px;
   padding: 17px 0;
 }
-.card-shot .brew-time {
+.card-shot .brew-card:not([data-layout]) .brew-time {
   font-size: 30px;
 }
-.card-shot .brew-step-title {
+.card-shot .brew-card:not([data-layout]) .brew-step-title {
   font-size: 32px;
   gap: 12px;
 }
-.card-shot .brew-meta {
+.card-shot .brew-card:not([data-layout]) .brew-meta {
   font-size: 23px;
   gap: 10px;
 }
-.card-shot .brew-chip {
+.card-shot .brew-card:not([data-layout]) .brew-chip {
   font-size: 19px;
   padding: 3px 14px;
   border-width: 1.5px;
 }
-.card-shot .brew-comment {
+.card-shot .brew-card:not([data-layout]) .brew-comment {
   font-size: 24px;
 }
-.card-shot .brew-water {
+.card-shot .brew-card:not([data-layout]) .brew-water {
   gap: 10px;
   padding-top: 12px;
 }
-.card-shot .brew-bar {
+.card-shot .brew-card:not([data-layout]) .brew-bar {
   height: 10px;
 }
-.card-shot .brew-bar-label {
+.card-shot .brew-card:not([data-layout]) .brew-bar-label {
   font-size: 20px;
 }
-.card-shot .brew-target {
+.card-shot .brew-card:not([data-layout]) .brew-target {
   margin-top: 26px;
   font-size: 32px;
 }
-.card-shot .brew-target-time {
+.card-shot .brew-card:not([data-layout]) .brew-target-time {
   font-size: 30px;
 }
-.card-shot .brew-target-note {
+.card-shot .brew-card:not([data-layout]) .brew-target-note {
   margin: 8px 0 0;
   font-size: 22px;
 }
-.card-shot .brew-foot {
+.card-shot .brew-card:not([data-layout]) .brew-foot {
   font-size: 36px;
 }
 /* Room above the signature when the card fills the image, whatever ends the recipe */
-.card-shot .brew-card > :nth-last-child(2) {
+.card-shot .brew-card:not([data-layout]) > :nth-last-child(2) {
   margin-bottom: 28px;
 }
 

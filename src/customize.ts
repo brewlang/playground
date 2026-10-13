@@ -1,10 +1,14 @@
-// The card's style: a theme, an accent and a title font, all set through @brewlang/render's --brew-* variables.
+// The card's style: a layout (toHtml's), then a theme, an accent and a title font, set through @brewlang/render's --brew-* variables.
 // 'auto' sets nothing, so the card follows the playground's own light or dark theme
+
+import type { Layout } from "@brewlang/render";
+import { LAYOUTS } from "@brewlang/render";
 
 export type ThemeName = "auto" | "paper" | "night" | "roaster";
 export type FontName = "sans" | "serif" | "mono";
 
 export interface CardStyle {
+  layout: Layout;
   theme: ThemeName;
   accent?: string; // A swatch name or a '#rrggbb' color; absent: the theme's
   font: FontName;
@@ -12,7 +16,16 @@ export interface CardStyle {
 
 /// The accent a new card gets: cherry, #d42e3b, the site's red; the title in the site's font
 export const DEFAULT_ACCENT = "cherry";
-export const DEFAULT_STYLE: CardStyle = { theme: "auto", accent: DEFAULT_ACCENT, font: "sans" };
+export const DEFAULT_STYLE: CardStyle = { layout: "classic", theme: "auto", accent: DEFAULT_ACCENT, font: "sans" };
+
+/** The layouts, as the Customize menu names them. */
+export const LAYOUT_LABELS: Record<Layout, string> = {
+  classic: "Classic",
+  minimal: "Minimal",
+  receipt: "Receipt",
+  poster: "Poster",
+  chart: "Chart",
+};
 
 /// Every color of a card, as brew.css names them without the '--brew-' prefix
 type Palette = Record<"bg" | "ink" | "muted" | "faint" | "rule" | "rule-soft" | "soft" | "accent" | "qual" | "qual-line", string>;
@@ -108,8 +121,9 @@ export function applyStyle(card: Element | null, style: CardStyle) {
 /** The CSS a developer pastes next to brew.css to get the same card. */
 export function css(style: CardStyle): string {
   const vars = variables(style);
-  if (Object.keys(vars).length === 0) return "/* The default card: brew.css alone */\n";
-  return `.brew-card {\n${Object.entries(vars)
+  const layout = style.layout === "classic" ? "" : `/* The ${style.layout} layout: toHtml(model, { layout: "${style.layout}" }) */\n`;
+  if (Object.keys(vars).length === 0) return `${layout}/* The default card: brew.css alone */\n`;
+  return `${layout}.brew-card {\n${Object.entries(vars)
     .map(([name, value]) => `  ${name}: ${value};`)
     .join("\n")}\n}\n`;
 }
@@ -117,6 +131,7 @@ export function css(style: CardStyle): string {
 /** The style as URL parameters, only what differs from the default: 't=roaster&a=berry&f=sans'. */
 export function toParams(style: CardStyle): URLSearchParams {
   const params = new URLSearchParams();
+  if (style.layout !== DEFAULT_STYLE.layout) params.set("l", style.layout);
   if (style.theme !== DEFAULT_STYLE.theme) params.set("t", style.theme);
   // No 'a' is the default accent; 'a=theme' keeps the theme's own
   if (style.accent === undefined) params.set("a", "theme");
@@ -128,6 +143,8 @@ export function toParams(style: CardStyle): URLSearchParams {
 /** Reads a style from URL parameters or saved text; anything unknown falls back to the default. */
 export function fromParams(params: URLSearchParams): CardStyle {
   const style: CardStyle = { ...DEFAULT_STYLE };
+  const layout = params.get("l");
+  if (layout && (LAYOUTS as readonly string[]).includes(layout)) style.layout = layout as Layout;
   const theme = params.get("t");
   if (theme && (theme === "auto" || theme in THEMES)) style.theme = theme as ThemeName;
   const accent = params.get("a");

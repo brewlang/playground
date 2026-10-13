@@ -20,8 +20,20 @@ export const decode = (hash: string): string | null => {
 /** A link that opens this recipe in the playground; nothing is uploaded. */
 export const shareUrl = (source: string) => `${location.origin}${location.pathname}#src=${encode(source)}`;
 
+/// What an SVG drawing needs from its CSS: html-to-image copies the computed styles of HTML elements, not of SVG ones
+const SVG_STYLES = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linejoin", "vector-effect", "shape-rendering", "font-family", "font-size", "font-weight"];
+
+/// Writes the computed styles of every SVG shape inline, so the image keeps the chart's colors
+function inlineSvgStyles(node: HTMLElement) {
+  for (const el of node.querySelectorAll<SVGElement>("svg *")) {
+    const computed = getComputedStyle(el);
+    for (const name of SVG_STYLES) el.style.setProperty(name, computed.getPropertyValue(name));
+  }
+}
+
 /** Saves an element as a PNG at its own size, by default twice as sharp for retina screens. */
 export async function downloadSnapshot(node: HTMLElement, filename: string, pixelRatio = 2) {
+  inlineSvgStyles(node);
   const link = document.createElement("a");
   link.href = await toPng(node, { pixelRatio, cacheBust: true });
   link.download = filename;
