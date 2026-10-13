@@ -1197,6 +1197,10 @@ button {
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
+.export .brew-note {
+  margin: 10px 0 0;
+  font-size: 26px;
+}
 .export .brew-specs {
   margin-top: 48px;
   border-top-width: 2px;
@@ -1272,8 +1276,16 @@ button {
 .export .brew-target-time {
   font-size: 30px;
 }
+.export .brew-target-note {
+  margin: 8px 0 0;
+  font-size: 22px;
+}
 .export .brew-foot {
   font-size: 36px;
+}
+/* Room above the signature when the card fills the image, whatever ends the recipe */
+.export .brew-card > :nth-last-child(2) {
+  margin-bottom: 28px;
 }
 
 /* Narrow screens: the code or the recipe, with the actions at the bottom */
