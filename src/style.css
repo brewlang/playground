@@ -1585,3 +1585,53 @@ button {
     display: flex;
   }
 }
+
+/* The code image, like carbon.now.sh: the editor's colors in a window on the card's accent, off screen until it is saved */
+
+.snippet {
+  --snippet-accent: var(--accent);
+  display: inline-block;
+  padding: 56px;
+  background: linear-gradient(135deg, var(--snippet-accent), color-mix(in oklch, var(--snippet-accent) 55%, #000));
+}
+.snippet-window {
+  min-width: 480px;
+  max-width: 960px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 24px 60px -12px oklch(0 0 0 / 0.45);
+  overflow: hidden;
+}
+.snippet-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px 0;
+}
+.snippet-bar i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.snippet-bar i:nth-child(2) {
+  background: #febc2e;
+}
+.snippet-bar i:nth-child(3) {
+  background: #28c840;
+}
+.snippet-bar span {
+  flex: 1;
+  margin-right: 44px;
+  text-align: center;
+  font: 500 13px var(--sans);
+  color: var(--faint);
+}
+.snippet-code {
+  margin: 0;
+  padding: 20px 28px 28px;
+  font: 15px/1.6 var(--mono);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

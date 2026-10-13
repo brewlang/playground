@@ -1,4 +1,4 @@
-import { toCanvas } from "html-to-image";
+import { toCanvas, toPng } from "html-to-image";
 
 /** The recipe in a URL hash, as base64url UTF-8: '#src=…'. */
 export const encode = (source: string) =>
@@ -36,6 +36,14 @@ export async function downloadPng(node: HTMLElement, filename: string, width: nu
 
   const link = document.createElement("a");
   link.href = canvas.toDataURL("image/png");
+  link.download = filename;
+  link.click();
+}
+
+/** Saves an element as a PNG at its own size, twice as sharp for retina screens. */
+export async function downloadSnapshot(node: HTMLElement, filename: string) {
+  const link = document.createElement("a");
+  link.href = await toPng(node, { pixelRatio: 2, cacheBust: true });
   link.download = filename;
   link.click();
 }

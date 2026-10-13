@@ -6,12 +6,12 @@ import type { RenderResult } from "@brewlang/render";
 import { brewerKind, render, toHtml } from "@brewlang/render";
 import "@brewlang/render/brew.css";
 import { brewAutocomplete } from "./complete";
-import { brewHighlight } from "./highlight";
+import { brewHighlight, highlightHtml } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
-import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams } from "./customize";
-import { decode, downloadPng, downloadText, shareUrl } from "./share";
+import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
+import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -654,6 +654,33 @@ $("download").addEventListener("click", async () => {
     await document.fonts.ready;
     await downloadPng(exportBox.firstElementChild as HTMLElement, name, 1080, 1350);
     toast(`Saved ${name} (1080 × 1350).`);
+  } catch {
+    toast("The image could not be made in this browser.");
+  } finally {
+    exportBox.replaceChildren();
+  }
+});
+
+// The code as an image, like carbon.now.sh: the editor's colors in a window, on the card's accent
+$("download-code").addEventListener("click", async () => {
+  openMenu(undefined);
+  const code = source().trimEnd();
+  if (!code) return toast("Write a recipe first: there is no code to show.");
+
+  const file = state.file.endsWith(".brew") ? state.file : `${state.file}.brew`;
+  const name = `${file.replace(/\.brew$/, "")}-code.png`;
+  const snippet = document.createElement("div");
+  snippet.className = "snippet";
+  const accent = variables(style)["--brew-accent"];
+  if (accent) snippet.style.setProperty("--snippet-accent", accent);
+  snippet.innerHTML = `<div class="snippet-window"><div class="snippet-bar"><i></i><i></i><i></i><span></span></div><pre class="snippet-code">${highlightHtml(code)}</pre></div>`;
+  snippet.querySelector(".snippet-bar span")!.textContent = file;
+  const exportBox = $("export");
+  exportBox.replaceChildren(snippet);
+  try {
+    await document.fonts.ready;
+    await downloadSnapshot(snippet, name);
+    toast(`Saved ${name}.`);
   } catch {
     toast("The image could not be made in this browser.");
   } finally {
