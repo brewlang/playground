@@ -1691,6 +1691,9 @@ button {
 .code-preview.clear {
   background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;
 }
+#code-backgrounds {
+  gap: 8px; /* Eight swatches on one line */
+}
 .segmented.fill button {
   flex: 1;
 }

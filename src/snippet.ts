@@ -3,12 +3,23 @@
 import { highlightLines } from "./highlight";
 
 export interface SnippetLook {
-  background: "accent" | "none";
+  background: "accent" | "none" | string; // The card's accent, nothing, or a '#rrggbb' color
   window: "auto" | "light" | "dark"; // 'auto' follows the playground's theme
   bar: boolean; // The title bar: three dots and the file name
   numbers: boolean;
   format: Format;
 }
+
+/// The background swatches besides the accent and nothing; any other color comes from the picker
+export const BACKGROUNDS: Record<string, string> = {
+  "#141210": "Ink",
+  "#f4f3ef": "Paper",
+  "#3d6584": "Slate",
+  "#17795e": "Pine",
+  "#c08a2e": "Honey",
+};
+
+const HEX = /^#[0-9a-f]{6}$/i;
 
 /// The image's size: 'auto' fits the code; the others are social formats, in pixels
 export type Format = "auto" | "square" | "portrait" | "story" | "wide";
@@ -24,7 +35,7 @@ export const DEFAULT_LOOK: SnippetLook = { background: "accent", window: "auto",
 /** A look as short parameters, for storage: only what differs from the default. */
 export function lookToParams(look: SnippetLook): string {
   const params = new URLSearchParams();
-  if (look.background !== DEFAULT_LOOK.background) params.set("bg", look.background);
+  if (look.background !== DEFAULT_LOOK.background) params.set("bg", look.background.replace(/^#/, ""));
   if (look.window !== DEFAULT_LOOK.window) params.set("w", look.window);
   if (look.bar !== DEFAULT_LOOK.bar) params.set("bar", look.bar ? "1" : "0");
   if (look.numbers !== DEFAULT_LOOK.numbers) params.set("n", look.numbers ? "1" : "0");
@@ -38,6 +49,7 @@ export function lookFromParams(text: string | null): SnippetLook {
   const look = { ...DEFAULT_LOOK };
   const bg = params.get("bg");
   if (bg === "accent" || bg === "none") look.background = bg;
+  else if (bg && HEX.test(`#${bg}`)) look.background = `#${bg.toLowerCase()}`;
   const w = params.get("w");
   if (w === "auto" || w === "light" || w === "dark") look.window = w;
   if (params.has("bar")) look.bar = params.get("bar") === "1";
@@ -47,12 +59,13 @@ export function lookFromParams(text: string | null): SnippetLook {
   return look;
 }
 
-/** The code image as an element, to show or to save; `accent` is the card's, when it sets one. */
+/** The code image as an element, to show or to save; `accent` is the card's, when it sets one, for the accent background. */
 export function snippet(code: string, file: string, look: SnippetLook, accent?: string): HTMLElement {
   const root = document.createElement("div");
   root.className = `snippet${look.background === "none" ? " clear" : ""}`;
   if (look.window !== "auto") root.dataset.window = look.window;
-  if (accent) root.style.setProperty("--snippet-accent", accent);
+  const color = look.background.startsWith("#") ? look.background : accent;
+  if (color) root.style.setProperty("--snippet-accent", color);
   // A format is drawn at half its size, saved twice as sharp: the exact pixels
   if (look.format !== "auto") {
     const { width, height } = FORMATS[look.format];

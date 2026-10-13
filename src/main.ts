@@ -13,7 +13,7 @@ import type { CardStyle } from "./customize";
 import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
 import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
 import type { SnippetLook } from "./snippet";
-import { FORMATS, fitSnippet, lookFromParams, lookToParams, snippet } from "./snippet";
+import { BACKGROUNDS, FORMATS, fitSnippet, lookFromParams, lookToParams, snippet } from "./snippet";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -672,7 +672,7 @@ const codeFile = () => (state.file.endsWith(".brew") ? state.file : `${state.fil
 const codeImage = () => snippet(source().trimEnd(), codeFile(), look, variables(style)["--brew-accent"]);
 
 /// The preview: the image itself, scaled down to the menu's width
-function renderCode() {
+function renderPreview() {
   const preview = $("code-preview");
   const image = codeImage();
   preview.replaceChildren(image);
@@ -683,20 +683,47 @@ function renderCode() {
   image.style.flex = "none";
   image.style.marginRight = `${-image.offsetWidth * (1 - scale)}px`; // The layout box shrinks with the picture, so it centers
   preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
+}
 
+/// The menu: the preview and every option
+function renderCode() {
+  renderPreview();
   const setLook = (next: SnippetLook) => {
     look = next;
     storage.set("code", lookToParams(look));
     renderCode();
   };
+  // The background: nothing, the card's accent, a swatch or any color, each as a gradient
+  const accent = variables(style)["--brew-accent"] ?? "var(--accent)";
+  const customBg = look.background.startsWith("#") && !(look.background in BACKGROUNDS) ? look.background : undefined;
   choices(
     "code-backgrounds",
     [
-      ["accent", "Accent", look.background === "accent"],
       ["none", "Transparent", look.background === "none"],
+      ["accent", "Accent", look.background === "accent"],
+      ...Object.entries(BACKGROUNDS).map(([color, label]): [string, string, boolean] => [color, label, look.background === color]),
     ],
-    (value) => setLook({ ...look, background: value as SnippetLook["background"] }),
+    (value) => setLook({ ...look, background: value }),
+    (button, value) => button.style.setProperty("--swatch", value === "accent" ? accent : value),
   );
+  const bgPicker = document.createElement("label");
+  bgPicker.className = `swatch-custom${customBg ? " on" : ""}`;
+  bgPicker.title = "Any color";
+  bgPicker.innerHTML = `<input type="color" aria-label="Any background color" />`;
+  const bgInput = bgPicker.querySelector("input")!;
+  bgInput.value = customBg ?? "#2a2f3a";
+  if (customBg) bgPicker.style.setProperty("--swatch", customBg);
+  // Like the accent's picker: 'input' leaves the menu as it is, so the open picker stays attached
+  bgInput.addEventListener("input", () => {
+    look = { ...look, background: bgInput.value };
+    storage.set("code", lookToParams(look));
+    renderPreview();
+    for (const button of $("code-backgrounds").querySelectorAll("button")) button.classList.remove("on");
+    bgPicker.classList.add("on");
+    bgPicker.style.setProperty("--swatch", bgInput.value);
+  });
+  bgInput.addEventListener("change", () => renderCode());
+  $("code-backgrounds").append(bgPicker);
   choices(
     "code-windows",
     [
