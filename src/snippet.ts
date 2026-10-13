@@ -1,4 +1,4 @@
-// The code as an image, like carbon.now.sh: the editor's colors in a window, on the card's accent or on nothing
+// The code as an image: the editor's colors in a window, on the card's accent or on nothing
 
 import { highlightLines } from "./highlight";
 
