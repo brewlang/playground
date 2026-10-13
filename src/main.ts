@@ -13,7 +13,7 @@ import type { CardStyle } from "./customize";
 import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
 import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
 import type { SnippetLook } from "./snippet";
-import { lookFromParams, lookToParams, snippet } from "./snippet";
+import { FORMATS, fitSnippet, lookFromParams, lookToParams, snippet } from "./snippet";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -676,8 +676,12 @@ function renderCode() {
   const preview = $("code-preview");
   const image = codeImage();
   preview.replaceChildren(image);
-  const scale = Math.min(1, preview.clientWidth / image.offsetWidth);
+  preview.classList.toggle("clear", look.background === "none");
+  fitSnippet(image);
+  const scale = Math.min(1, preview.clientWidth / image.offsetWidth, 360 / image.offsetHeight);
   image.style.transform = `scale(${scale})`;
+  image.style.flex = "none";
+  image.style.marginRight = `${-image.offsetWidth * (1 - scale)}px`; // The layout box shrinks with the picture, so it centers
   preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
 
   const setLook = (next: SnippetLook) => {
@@ -710,6 +714,12 @@ function renderCode() {
     ],
     (value) => setLook(value === "bar" ? { ...look, bar: !look.bar } : { ...look, numbers: !look.numbers }),
   );
+  choices(
+    "code-formats",
+    [["auto", "Fit", look.format === "auto"], ...Object.entries(FORMATS).map(([key, f]): [string, string, boolean] => [key, f.label, look.format === key])],
+    (value) => setLook({ ...look, format: value as SnippetLook["format"] }),
+    (button, value) => (button.title = value === "auto" ? "The code's own size" : `${FORMATS[value as keyof typeof FORMATS].width} × ${FORMATS[value as keyof typeof FORMATS].height}`),
+  );
 }
 
 $("download-code").addEventListener("click", () => {
@@ -728,6 +738,7 @@ $("download-code-png").addEventListener("click", async () => {
   exportBox.replaceChildren(image);
   try {
     await document.fonts.ready;
+    fitSnippet(image);
     await downloadSnapshot(image, name);
     toast(`Saved ${name}.`);
   } catch {

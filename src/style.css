@@ -1598,6 +1598,18 @@ button {
   background: linear-gradient(135deg, var(--snippet-accent), color-mix(in oklch, var(--snippet-accent) 55%, #000));
   transform-origin: 0 0;
 }
+/* In a social format: a fixed frame, the window centered and scaled by fitSnippet() */
+.snippet.framed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+.snippet.framed .snippet-window {
+  flex: none;
+  max-width: var(--snippet-max);
+}
 .snippet.clear {
   padding: 32px;
   background: none;
@@ -1670,8 +1682,13 @@ button {
   }
 }
 .code-preview {
+  display: flex;
+  justify-content: center;
   overflow: hidden;
   border-radius: 6px;
+  background: var(--soft);
+}
+.code-preview.clear {
   background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;
 }
 .segmented.fill button {
