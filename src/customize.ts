@@ -189,8 +189,8 @@ export function accentCss([accentL, accentC, hue]: [number, number, number]): st
       `--syn-brewer: oklch(${(dark ? clamp(accentL, 0.66, 0.78) : clamp(accentL, 0.42, 0.52)).toFixed(3)} ${accentC.toFixed(3)} ${hue.toFixed(1)});`,
     ].join(" ");
   return [
-    `:root { ${block(0)} }`,
+    `:root, .snippet[data-window="light"] { ${block(0)} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${block(1)} } }`,
-    `:root[data-theme="dark"] { ${block(1)} }`,
+    `:root[data-theme="dark"], .snippet[data-window="dark"] { ${block(1)} }`,
   ].join("\n");
 }

@@ -108,15 +108,22 @@ function decorate(view: EditorView): DecorationSet {
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** A .brew source as HTML, colored like the editor: escaped text and 'tok-' spans. */
-export function highlightHtml(source: string): string {
-  let html = "";
+/** A .brew source as HTML lines, colored like the editor: escaped text and 'tok-' spans. */
+export function highlightLines(source: string): string[] {
+  const lines = [""];
+  const put = (text: string, role?: string) =>
+    text.split("\n").forEach((part, i) => {
+      if (i > 0) lines.push("");
+      if (part) lines[lines.length - 1] += role ? `<span class="tok-${role}">${escape(part)}</span>` : escape(part);
+    });
   let at = 0;
   for (const { from, to, role } of spans(source)) {
-    html += escape(source.slice(at, from)) + `<span class="tok-${role}">${escape(source.slice(from, to))}</span>`;
+    put(source.slice(at, from));
+    put(source.slice(from, to), role);
     at = to;
   }
-  return html + escape(source.slice(at));
+  put(source.slice(at));
+  return lines;
 }
 
 /** Colors a .brew document with the brewlang lexer. */

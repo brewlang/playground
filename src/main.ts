@@ -6,12 +6,14 @@ import type { RenderResult } from "@brewlang/render";
 import { brewerKind, render, toHtml } from "@brewlang/render";
 import "@brewlang/render/brew.css";
 import { brewAutocomplete } from "./complete";
-import { brewHighlight, highlightHtml } from "./highlight";
+import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
 import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
 import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
+import type { SnippetLook } from "./snippet";
+import { lookFromParams, lookToParams, snippet } from "./snippet";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -45,7 +47,7 @@ const state = {
   factor: 1,
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
-  menu: undefined as "examples" | "share" | "customize" | "scale" | undefined,
+  menu: undefined as "examples" | "share" | "customize" | "scale" | "code" | undefined,
 };
 
 // A shared link carries the recipe and the card's style: '#src=…&t=roaster&a=berry'
@@ -521,6 +523,8 @@ function openMenu(menu: typeof state.menu) {
   $("share-menu").hidden = state.menu !== "share";
   $("customize-menu").hidden = state.menu !== "customize";
   $("scale-menu").hidden = state.menu !== "scale";
+  $("code-menu").hidden = state.menu !== "code";
+  if (state.menu === "code") renderCode();
   $("scrim").hidden = !state.menu;
   if (state.menu === "share") $("share-url").textContent = link();
 
@@ -661,25 +665,70 @@ $("download").addEventListener("click", async () => {
   }
 });
 
-// The code as an image, like carbon.now.sh: the editor's colors in a window, on the card's accent
-$("download-code").addEventListener("click", async () => {
-  openMenu(undefined);
-  const code = source().trimEnd();
-  if (!code) return toast("Write a recipe first: there is no code to show.");
+// The code as an image, like carbon.now.sh: a menu of its own, with a preview
 
-  const file = state.file.endsWith(".brew") ? state.file : `${state.file}.brew`;
-  const name = `${file.replace(/\.brew$/, "")}-code.png`;
-  const snippet = document.createElement("div");
-  snippet.className = "snippet";
-  const accent = variables(style)["--brew-accent"];
-  if (accent) snippet.style.setProperty("--snippet-accent", accent);
-  snippet.innerHTML = `<div class="snippet-window"><div class="snippet-bar"><i></i><i></i><i></i><span></span></div><pre class="snippet-code">${highlightHtml(code)}</pre></div>`;
-  snippet.querySelector(".snippet-bar span")!.textContent = file;
+let look = lookFromParams(storage.get("code"));
+const codeFile = () => (state.file.endsWith(".brew") ? state.file : `${state.file}.brew`);
+const codeImage = () => snippet(source().trimEnd(), codeFile(), look, variables(style)["--brew-accent"]);
+
+/// The preview: the image itself, scaled down to the menu's width
+function renderCode() {
+  const preview = $("code-preview");
+  const image = codeImage();
+  preview.replaceChildren(image);
+  const scale = Math.min(1, preview.clientWidth / image.offsetWidth);
+  image.style.transform = `scale(${scale})`;
+  preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
+
+  const setLook = (next: SnippetLook) => {
+    look = next;
+    storage.set("code", lookToParams(look));
+    renderCode();
+  };
+  choices(
+    "code-backgrounds",
+    [
+      ["accent", "Accent", look.background === "accent"],
+      ["none", "Transparent", look.background === "none"],
+    ],
+    (value) => setLook({ ...look, background: value as SnippetLook["background"] }),
+  );
+  choices(
+    "code-windows",
+    [
+      ["auto", "Auto", look.window === "auto"],
+      ["light", "Light", look.window === "light"],
+      ["dark", "Dark", look.window === "dark"],
+    ],
+    (value) => setLook({ ...look, window: value as SnippetLook["window"] }),
+  );
+  choices(
+    "code-shows",
+    [
+      ["bar", "Title bar", look.bar],
+      ["numbers", "Line numbers", look.numbers],
+    ],
+    (value) => setLook(value === "bar" ? { ...look, bar: !look.bar } : { ...look, numbers: !look.numbers }),
+  );
+}
+
+$("download-code").addEventListener("click", () => {
+  if (!source().trim()) {
+    openMenu(undefined);
+    return toast("Write a recipe first: there is no code to show.");
+  }
+  openMenu("code");
+});
+
+$("download-code-png").addEventListener("click", async () => {
+  openMenu(undefined);
+  const name = `${codeFile().replace(/\.brew$/, "")}-code.png`;
+  const image = codeImage();
   const exportBox = $("export");
-  exportBox.replaceChildren(snippet);
+  exportBox.replaceChildren(image);
   try {
     await document.fonts.ready;
-    await downloadSnapshot(snippet, name);
+    await downloadSnapshot(image, name);
     toast(`Saved ${name}.`);
   } catch {
     toast("The image could not be made in this browser.");

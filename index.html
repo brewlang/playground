@@ -142,14 +142,35 @@
         </button>
         <div class="menu-rule"></div>
         <button type="button" id="download-code" class="menu-item">
-          <strong>Download code image</strong>
-          <span class="muted">A PNG of the code, colored like the editor, on the card's accent.</span>
+          <strong>Code image</strong>
+          <span class="muted">A PNG of the code, colored like the editor, like carbon.now.sh.</span>
         </button>
         <div class="menu-rule"></div>
         <button type="button" id="download-brew" class="menu-item">
           <strong>Download .brew</strong>
           <span class="muted">The recipe as a text file, to keep, edit or open in any Brewlang tool.</span>
         </button>
+      </div>
+
+      <div id="code-menu" class="menu customize-menu code-menu" hidden>
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Code image</div>
+        <div id="code-preview" class="code-preview" aria-hidden="true"></div>
+        <div class="custom-section">
+          <div class="label">Background</div>
+          <div id="code-backgrounds" class="segmented fill"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Window</div>
+          <div id="code-windows" class="segmented fill"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Show</div>
+          <div id="code-shows" class="segmented fill"></div>
+        </div>
+        <div class="custom-actions">
+          <button type="button" id="download-code-png" class="btn-primary">Download PNG</button>
+        </div>
       </div>
 
       <div id="scale-menu" class="menu scale-menu" hidden>

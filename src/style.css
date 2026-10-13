@@ -1,5 +1,6 @@
-/* Light by default; dark from the system, unless the reader picked a theme */
-:root {
+/* Light by default; dark from the system, unless the reader picked a theme. The code image can force either */
+:root,
+.snippet[data-window="light"] {
   --bg: #f4f3ef;
   --panel: #ece8e0;
   --card: #ffffff;
@@ -100,7 +101,8 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+.snippet[data-window="dark"] {
   --bg: #12110f;
   --panel: #0b0a08;
   --card: #1b1916;
@@ -1586,13 +1588,19 @@ button {
   }
 }
 
-/* The code image, like carbon.now.sh: the editor's colors in a window on the card's accent, off screen until it is saved */
+/* The code image, like carbon.now.sh: the editor's colors in a window, on the card's accent or on nothing */
 
 .snippet {
   --snippet-accent: var(--accent);
   display: inline-block;
+  width: max-content; /* Its own width wherever it is: the preview, the export box or a phone */
   padding: 56px;
   background: linear-gradient(135deg, var(--snippet-accent), color-mix(in oklch, var(--snippet-accent) 55%, #000));
+  transform-origin: 0 0;
+}
+.snippet.clear {
+  padding: 32px;
+  background: none;
 }
 .snippet-window {
   min-width: 480px;
@@ -1601,6 +1609,9 @@ button {
   background: var(--card);
   box-shadow: 0 24px 60px -12px oklch(0 0 0 / 0.45);
   overflow: hidden;
+}
+.snippet.clear .snippet-window {
+  box-shadow: 0 12px 32px -8px oklch(0 0 0 / 0.35), 0 0 0 1px oklch(0 0 0 / 0.08);
 }
 .snippet-bar {
   display: flex;
@@ -1628,10 +1639,44 @@ button {
   color: var(--faint);
 }
 .snippet-code {
-  margin: 0;
-  padding: 20px 28px 28px;
+  padding: 28px;
   font: 15px/1.6 var(--mono);
   color: var(--ink);
+}
+.snippet-bar + .snippet-code {
+  padding-top: 20px;
+}
+.snippet-line {
+  display: flex;
+  min-height: 1.6em;
+}
+.snippet-num {
+  flex: none;
+  margin-right: 2ch;
+  text-align: right;
+  color: var(--syn-punct);
+}
+.snippet-text {
+  flex: 1;
+  min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Its menu: under Share on wide screens, a sheet on narrow ones; the preview on a checkerboard, for the transparent background */
+@media (min-width: 861px) {
+  .code-menu {
+    right: 64px;
+  }
+}
+.code-preview {
+  overflow: hidden;
+  border-radius: 6px;
+  background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;
+}
+.segmented.fill button {
+  flex: 1;
+}
+.code-menu .custom-actions .btn-primary {
+  flex: 1;
 }
