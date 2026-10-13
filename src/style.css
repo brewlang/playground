@@ -1,5 +1,6 @@
-/* Light by default; dark from the system, unless the reader picked a theme */
-:root {
+/* Light by default; dark from the system, unless the reader picked a theme. The code image can force either */
+:root,
+.snippet[data-window="light"] {
   --bg: #f4f3ef;
   --panel: #ece8e0;
   --card: #ffffff;
@@ -100,7 +101,8 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+.snippet[data-window="dark"] {
   --bg: #12110f;
   --panel: #0b0a08;
   --card: #1b1916;
@@ -1584,4 +1586,124 @@ button {
   .menu-item.sheet-customize {
     display: flex;
   }
+}
+
+/* The code image, like carbon.now.sh: the editor's colors in a window, on the card's accent or on nothing */
+
+.snippet {
+  --snippet-accent: var(--accent);
+  display: inline-block;
+  width: max-content; /* Its own width wherever it is: the preview, the export box or a phone */
+  padding: 56px;
+  background: linear-gradient(135deg, var(--snippet-accent), color-mix(in oklch, var(--snippet-accent) 55%, #000));
+  transform-origin: 0 0;
+}
+/* In a social format: a fixed frame, the window centered and scaled by fitSnippet() */
+.snippet.framed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+.snippet.framed .snippet-window {
+  flex: none;
+  max-width: var(--snippet-max);
+}
+.snippet.solid {
+  background: var(--snippet-accent);
+}
+.snippet.clear {
+  padding: 32px;
+  background: none;
+}
+.snippet-window {
+  min-width: 480px;
+  max-width: 960px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 24px 60px -12px oklch(0 0 0 / 0.45);
+  overflow: hidden;
+}
+.snippet.clear .snippet-window {
+  box-shadow: 0 12px 32px -8px oklch(0 0 0 / 0.35), 0 0 0 1px oklch(0 0 0 / 0.08);
+}
+.snippet-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px 0;
+}
+.snippet-bar i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.snippet-bar i:nth-child(2) {
+  background: #febc2e;
+}
+.snippet-bar i:nth-child(3) {
+  background: #28c840;
+}
+.snippet-bar span {
+  flex: 1;
+  margin-right: 44px;
+  text-align: center;
+  font: 500 13px var(--sans);
+  color: var(--faint);
+}
+.snippet-code {
+  padding: 28px;
+  font: 15px/1.6 var(--mono);
+  color: var(--ink);
+}
+.snippet-bar + .snippet-code {
+  padding-top: 20px;
+}
+.snippet-line {
+  display: flex;
+  min-height: 1.6em;
+}
+.snippet-num {
+  flex: none;
+  margin-right: 2ch;
+  text-align: right;
+  color: var(--syn-punct);
+}
+.snippet-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Its menu: under Share on wide screens, a sheet on narrow ones; the preview on a checkerboard, for the transparent background */
+@media (min-width: 861px) {
+  .code-menu {
+    right: 64px;
+  }
+}
+.code-preview {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Never stretched to the last preview's height */
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--soft);
+}
+.code-preview > .snippet {
+  flex: none; /* Its own size, measured before it is scaled down */
+}
+.code-preview.clear {
+  background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;
+}
+#code-backgrounds {
+  gap: 8px; /* Eight swatches on one line */
+}
+.segmented.fill button {
+  flex: 1;
+}
+.code-menu .custom-actions .btn-primary {
+  flex: 1;
 }

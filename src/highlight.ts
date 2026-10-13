@@ -44,13 +44,22 @@ function role(word: Token[]): string | undefined {
   }
 }
 
-/// Color every word; lines and columns are 1-based, CodeMirror positions are offsets
-function decorate(view: EditorView): DecorationSet {
-  const { doc } = view.state;
-  const builder = new RangeSetBuilder<Decoration>();
-  const offset = (t: Token) => doc.line(t.line).from + t.column - 1;
+/// A colored range of the source: offsets, and the role that names its 'tok-' class
+interface Span {
+  from: number;
+  to: number;
+  role: string;
+}
 
-  const tokens = lex(doc.toString()).tokens.filter((t) => t.text && t.kind !== "NEWLINE" && t.line <= doc.lines);
+/// Every colored word of a source, in order; lines and columns are 1-based
+function spans(source: string): Span[] {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) if (source[i] === "\n") starts.push(i + 1);
+  const offset = (t: Token) => starts[t.line - 1]! + t.column - 1;
+  const out: Span[] = [];
+  const add = (from: number, to: number, role: string) => out.push({ from, to: Math.min(to, source.length), role });
+
+  const tokens = lex(source).tokens.filter((t) => t.text && t.kind !== "NEWLINE" && t.line <= starts.length);
   let i = 0;
 
   while (i < tokens.length) {
@@ -61,11 +70,11 @@ function decorate(view: EditorView): DecorationSet {
       let from = offset(first);
       for (const line of first.text.split("\n")) {
         const key = /^([\w-]+)(:)/.exec(line);
-        if (/^---\s*$/.test(line)) builder.add(from, from + 3, MARKS.punct!);
+        if (/^---\s*$/.test(line)) add(from, from + 3, "punct");
         else if (key) {
-          builder.add(from, from + key[1]!.length, MARKS.fmkey!);
-          if (line.length > key[0].length) builder.add(from + key[0].length, from + line.length, MARKS.fmval!);
-        } else if (line.trim()) builder.add(from, from + line.length, MARKS.fmval!);
+          add(from, from + key[1]!.length, "fmkey");
+          if (line.length > key[0].length) add(from + key[0].length, from + line.length, "fmval");
+        } else if (line.trim()) add(from, from + line.length, "fmval");
         from += line.length + 1;
       }
       i++;
@@ -83,11 +92,38 @@ function decorate(view: EditorView): DecorationSet {
     }
 
     const name = role(word);
-    if (name) builder.add(offset(first), Math.min(end, doc.length), MARKS[name]!);
+    if (name) add(offset(first), end, name);
     i += word.length;
   }
 
+  return out;
+}
+
+/// The editor's decorations, from the spans
+function decorate(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const { from, to, role } of spans(view.state.doc.toString())) builder.add(from, to, MARKS[role]!);
   return builder.finish();
+}
+
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** A .brew source as HTML lines, colored like the editor: escaped text and 'tok-' spans. */
+export function highlightLines(source: string): string[] {
+  const lines = [""];
+  const put = (text: string, role?: string) =>
+    text.split("\n").forEach((part, i) => {
+      if (i > 0) lines.push("");
+      if (part) lines[lines.length - 1] += role ? `<span class="tok-${role}">${escape(part)}</span>` : escape(part);
+    });
+  let at = 0;
+  for (const { from, to, role } of spans(source)) {
+    put(source.slice(at, from));
+    put(source.slice(from, to), role);
+    at = to;
+  }
+  put(source.slice(at));
+  return lines;
 }
 
 /** Colors a .brew document with the brewlang lexer. */

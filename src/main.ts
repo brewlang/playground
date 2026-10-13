@@ -10,8 +10,10 @@ import { brewHighlight } from "./highlight";
 import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
-import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams } from "./customize";
-import { decode, downloadPng, downloadText, shareUrl } from "./share";
+import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
+import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
+import type { SnippetLook } from "./snippet";
+import { BACKGROUNDS, FORMATS, fitSnippet, lookFromParams, lookToParams, snippet } from "./snippet";
 
 // The real recipes of the brewlang repo, keyed by file name
 const EXAMPLES = Object.fromEntries(
@@ -45,7 +47,7 @@ const state = {
   factor: 1,
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
-  menu: undefined as "examples" | "share" | "customize" | "scale" | undefined,
+  menu: undefined as "examples" | "share" | "customize" | "scale" | "code" | undefined,
 };
 
 // A shared link carries the recipe and the card's style: '#src=…&t=roaster&a=berry'
@@ -521,6 +523,8 @@ function openMenu(menu: typeof state.menu) {
   $("share-menu").hidden = state.menu !== "share";
   $("customize-menu").hidden = state.menu !== "customize";
   $("scale-menu").hidden = state.menu !== "scale";
+  $("code-menu").hidden = state.menu !== "code";
+  if (state.menu === "code") renderCode();
   $("scrim").hidden = !state.menu;
   if (state.menu === "share") $("share-url").textContent = link();
 
@@ -654,6 +658,124 @@ $("download").addEventListener("click", async () => {
     await document.fonts.ready;
     await downloadPng(exportBox.firstElementChild as HTMLElement, name, 1080, 1350);
     toast(`Saved ${name} (1080 × 1350).`);
+  } catch {
+    toast("The image could not be made in this browser.");
+  } finally {
+    exportBox.replaceChildren();
+  }
+});
+
+// The code as an image, like carbon.now.sh: a menu of its own, with a preview
+
+let look = lookFromParams(storage.get("code"));
+const codeFile = () => (state.file.endsWith(".brew") ? state.file : `${state.file}.brew`);
+const codeImage = () => snippet(source().trimEnd(), codeFile(), look, variables(style)["--brew-accent"]);
+
+/// The preview: the image itself, scaled down to the menu's width
+function renderPreview() {
+  const preview = $("code-preview");
+  const image = codeImage();
+  preview.replaceChildren(image);
+  preview.classList.toggle("clear", look.background === "none");
+  fitSnippet(image);
+  const scale = Math.min(1, preview.clientWidth / image.offsetWidth, 360 / image.offsetHeight);
+  image.style.transform = `scale(${scale})`;
+  image.style.marginRight = `${-image.offsetWidth * (1 - scale)}px`; // The layout box shrinks with the picture, so it centers
+  preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
+}
+
+/// The menu: the preview and every option
+function renderCode() {
+  renderPreview();
+  const setLook = (next: SnippetLook) => {
+    look = next;
+    storage.set("code", lookToParams(look));
+    renderCode();
+  };
+  // The background: nothing, the card's accent, a swatch or any color, each as a gradient
+  const accent = variables(style)["--brew-accent"] ?? "var(--accent)";
+  const customBg = look.background.startsWith("#") && !(look.background in BACKGROUNDS) ? look.background : undefined;
+  choices(
+    "code-backgrounds",
+    [
+      ["none", "Transparent", look.background === "none"],
+      ["accent", "Accent", look.background === "accent"],
+      ...Object.entries(BACKGROUNDS).map(([color, label]): [string, string, boolean] => [color, label, look.background === color]),
+    ],
+    (value) => setLook({ ...look, background: value }),
+    (button, value) => button.style.setProperty("--swatch", value === "accent" ? accent : value),
+  );
+  const bgPicker = document.createElement("label");
+  bgPicker.className = `swatch-custom${customBg ? " on" : ""}`;
+  bgPicker.title = "Any color";
+  bgPicker.innerHTML = `<input type="color" aria-label="Any background color" />`;
+  const bgInput = bgPicker.querySelector("input")!;
+  bgInput.value = customBg ?? "#2a2f3a";
+  if (customBg) bgPicker.style.setProperty("--swatch", customBg);
+  // Like the accent's picker: 'input' leaves the menu as it is, so the open picker stays attached
+  bgInput.addEventListener("input", () => {
+    look = { ...look, background: bgInput.value };
+    storage.set("code", lookToParams(look));
+    renderPreview();
+    for (const button of $("code-backgrounds").querySelectorAll("button")) button.classList.remove("on");
+    bgPicker.classList.add("on");
+    bgPicker.style.setProperty("--swatch", bgInput.value);
+  });
+  bgInput.addEventListener("change", () => renderCode());
+  $("code-backgrounds").append(bgPicker);
+  choices(
+    "code-fills",
+    [
+      ["gradient", "Gradient", !look.solid],
+      ["solid", "Solid", look.solid],
+    ],
+    (value) => setLook({ ...look, solid: value === "solid" }),
+    (button) => (button.disabled = look.background === "none"),
+  );
+  choices(
+    "code-windows",
+    [
+      ["auto", "Auto", look.window === "auto"],
+      ["light", "Light", look.window === "light"],
+      ["dark", "Dark", look.window === "dark"],
+    ],
+    (value) => setLook({ ...look, window: value as SnippetLook["window"] }),
+  );
+  choices(
+    "code-shows",
+    [
+      ["bar", "Title bar", look.bar],
+      ["numbers", "Line numbers", look.numbers],
+    ],
+    (value) => setLook(value === "bar" ? { ...look, bar: !look.bar } : { ...look, numbers: !look.numbers }),
+  );
+  choices(
+    "code-formats",
+    [["auto", "Fit", look.format === "auto"], ...Object.entries(FORMATS).map(([key, f]): [string, string, boolean] => [key, f.label, look.format === key])],
+    (value) => setLook({ ...look, format: value as SnippetLook["format"] }),
+    (button, value) => (button.title = value === "auto" ? "The code's own size" : `${FORMATS[value as keyof typeof FORMATS].width} × ${FORMATS[value as keyof typeof FORMATS].height}`),
+  );
+}
+
+$("download-code").addEventListener("click", () => {
+  if (!source().trim()) {
+    openMenu(undefined);
+    return toast("Write a recipe first: there is no code to show.");
+  }
+  openMenu("code");
+});
+
+$("download-code-png").addEventListener("click", async () => {
+  openMenu(undefined);
+  const name = `${codeFile().replace(/\.brew$/, "")}-code.png`;
+  const image = codeImage();
+  const exportBox = $("export");
+  exportBox.replaceChildren(image);
+  try {
+    await document.fonts.ready;
+    fitSnippet(image);
+    await downloadSnapshot(image, name);
+    toast(`Saved ${name}.`);
   } catch {
     toast("The image could not be made in this browser.");
   } finally {
