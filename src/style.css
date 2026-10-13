@@ -835,7 +835,7 @@ button {
 
 /* The card comes from @brewlang/render (brew.css): it takes the playground's theme through its variables */
 #recipe .brew-card,
-#export .brew-card {
+.card-shot .brew-card {
   --brew-bg: var(--card);
   --brew-ink: var(--ink);
   --brew-muted: var(--muted);
@@ -1170,121 +1170,166 @@ button {
   display: none;
 }
 
-/* The shareable image: 1080 × 1350, off screen until it is saved */
+/* The images, off screen until they are saved */
 
 .export {
   position: fixed;
   left: -10000px;
   top: 0;
 }
-.export .brew-card {
+
+/* The card image: the card 1080px wide with bigger type, filling a format or on a background like the code image */
+
+.card-shot {
+  --snippet-accent: var(--accent);
+  display: inline-block;
+  width: max-content; /* Its own width wherever it is: the preview or the export box */
+  padding: 80px;
+  background: linear-gradient(135deg, var(--snippet-accent), color-mix(in oklch, var(--snippet-accent) 55%, #000));
+  transform-origin: 0 0;
+}
+.card-shot.solid {
+  background: var(--snippet-accent);
+}
+.card-shot.clear {
+  padding: 40px;
+  background: none;
+}
+.card-shot.bare {
+  padding: 0;
+  background: none;
+}
+/* In a format: a fixed frame, the card centered and scaled by fitCard(); filling it, from the top */
+.card-shot.framed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+.card-shot.framed.bare {
+  align-items: flex-start;
+}
+.card-shot.framed .brew-card {
+  flex: none;
+}
+.card-shot.framed.bare .brew-card {
+  transform-origin: top center;
+}
+.card-shot .brew-card {
   width: 1080px;
-  min-height: 1350px;
   border: 0;
   border-radius: 0;
   padding: 88px 88px 60px;
   gap: 0;
 }
-.export .brew-kicker {
+.card-shot:not(.bare) .brew-card {
+  border-radius: 20px;
+  box-shadow: 0 32px 80px -16px oklch(0 0 0 / 0.45);
+}
+.card-shot.clear .brew-card {
+  box-shadow: 0 12px 32px -8px oklch(0 0 0 / 0.35), 0 0 0 1px oklch(0 0 0 / 0.08);
+}
+.card-shot .brew-kicker {
   font-size: 24px;
   letter-spacing: 0.12em;
 }
-.export .brew-head {
+.card-shot .brew-head {
   gap: 14px;
 }
-.export .brew-title {
+.card-shot .brew-title {
   font-size: 84px;
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
-.export .brew-note {
+.card-shot .brew-note {
   margin: 10px 0 0;
   font-size: 26px;
 }
-.export .brew-specs {
+.card-shot .brew-specs {
   margin-top: 48px;
   border-top-width: 2px;
 }
-.export .brew-spec {
+.card-shot .brew-spec {
   padding: 22px 0 26px;
   gap: 10px;
 }
-.export .brew-spec dt {
+.card-shot .brew-spec dt {
   font-size: 18px;
   letter-spacing: 0.1em;
 }
-.export .brew-spec dd {
+.card-shot .brew-spec dd {
   font-size: 58px;
 }
-.export .brew-extras {
+.card-shot .brew-extras {
   margin-top: 22px;
   gap: 10px 40px;
   font-size: 24px;
 }
-.export .brew-prep {
+.card-shot .brew-prep {
   margin-top: 28px;
   padding: 18px 24px;
   border-radius: 6px;
 }
-.export .brew-prep h3 {
+.card-shot .brew-prep h3 {
   font-size: 27px;
 }
-.export .brew-prep li {
+.card-shot .brew-prep li {
   font-size: 24px;
 }
-.export .brew-steps {
+.card-shot .brew-steps {
   margin-top: 16px;
 }
-.export .brew-step {
+.card-shot .brew-step {
   grid-template-columns: 110px minmax(0, 1fr) 200px;
   gap: 24px;
   padding: 17px 0;
 }
-.export .brew-time {
+.card-shot .brew-time {
   font-size: 30px;
 }
-.export .brew-step-title {
+.card-shot .brew-step-title {
   font-size: 32px;
   gap: 12px;
 }
-.export .brew-meta {
+.card-shot .brew-meta {
   font-size: 23px;
   gap: 10px;
 }
-.export .brew-chip {
+.card-shot .brew-chip {
   font-size: 19px;
   padding: 3px 14px;
   border-width: 1.5px;
 }
-.export .brew-comment {
+.card-shot .brew-comment {
   font-size: 24px;
 }
-.export .brew-water {
+.card-shot .brew-water {
   gap: 10px;
   padding-top: 12px;
 }
-.export .brew-bar {
+.card-shot .brew-bar {
   height: 10px;
 }
-.export .brew-bar-label {
+.card-shot .brew-bar-label {
   font-size: 20px;
 }
-.export .brew-target {
+.card-shot .brew-target {
   margin-top: 26px;
   font-size: 32px;
 }
-.export .brew-target-time {
+.card-shot .brew-target-time {
   font-size: 30px;
 }
-.export .brew-target-note {
+.card-shot .brew-target-note {
   margin: 8px 0 0;
   font-size: 22px;
 }
-.export .brew-foot {
+.card-shot .brew-foot {
   font-size: 36px;
 }
 /* Room above the signature when the card fills the image, whatever ends the recipe */
-.export .brew-card > :nth-last-child(2) {
+.card-shot .brew-card > :nth-last-child(2) {
   margin-bottom: 28px;
 }
 
@@ -1704,13 +1749,15 @@ button {
   border-radius: 6px;
   background: var(--soft);
 }
-.code-preview > .snippet {
+.code-preview > .snippet,
+.code-preview > .card-shot {
   flex: none; /* Its own size, measured before it is scaled down */
 }
 .code-preview.clear {
   background: repeating-conic-gradient(var(--rule2) 0 25%, var(--card) 0 50%) 0 0 / 16px 16px;
 }
-#code-backgrounds {
+#code-backgrounds,
+#card-backgrounds {
   gap: 8px; /* Eight swatches on one line */
 }
 .segmented.fill button {

@@ -1,4 +1,4 @@
-import { toCanvas, toPng } from "html-to-image";
+import { toPng } from "html-to-image";
 
 /** The recipe in a URL hash, as base64url UTF-8: '#src=…'. */
 export const encode = (source: string) =>
@@ -20,30 +20,10 @@ export const decode = (hash: string): string | null => {
 /** A link that opens this recipe in the playground; nothing is uploaded. */
 export const shareUrl = (source: string) => `${location.origin}${location.pathname}#src=${encode(source)}`;
 
-/** Saves an element as a PNG of the given size; a taller element is scaled down to fit, centered. */
-export async function downloadPng(node: HTMLElement, filename: string, width: number, height: number) {
-  const natural = Math.max(height, node.scrollHeight);
-  const shot = await toCanvas(node, { width, height: natural, pixelRatio: 1, cacheBust: true });
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d")!;
-  context.fillStyle = getComputedStyle(node).backgroundColor;
-  context.fillRect(0, 0, width, height);
-  const scale = height / natural;
-  context.drawImage(shot, (width - width * scale) / 2, 0, width * scale, height);
-
+/** Saves an element as a PNG at its own size, by default twice as sharp for retina screens. */
+export async function downloadSnapshot(node: HTMLElement, filename: string, pixelRatio = 2) {
   const link = document.createElement("a");
-  link.href = canvas.toDataURL("image/png");
-  link.download = filename;
-  link.click();
-}
-
-/** Saves an element as a PNG at its own size, twice as sharp for retina screens. */
-export async function downloadSnapshot(node: HTMLElement, filename: string) {
-  const link = document.createElement("a");
-  link.href = await toPng(node, { pixelRatio: 2, cacheBust: true });
+  link.href = await toPng(node, { pixelRatio, cacheBust: true });
   link.download = filename;
   link.click();
 }

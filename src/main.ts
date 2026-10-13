@@ -11,7 +11,9 @@ import { brewLint, range } from "./lint";
 import { brewMarks } from "./marks";
 import type { CardStyle } from "./customize";
 import { ACCENTS, DEFAULT_STYLE, FONTS, THEMES, accentOklch, applyStyle, css, fromParams, accentCss, toParams, variables } from "./customize";
-import { decode, downloadPng, downloadSnapshot, downloadText, shareUrl } from "./share";
+import type { CardLook } from "./cardshot";
+import { CARD_FORMATS, cardLookFromParams, cardLookToParams, cardRatio, cardShot, fitCard } from "./cardshot";
+import { decode, downloadSnapshot, downloadText, shareUrl } from "./share";
 import type { SnippetLook } from "./snippet";
 import { BACKGROUNDS, FORMATS, fitSnippet, lookFromParams, lookToParams, snippet } from "./snippet";
 
@@ -47,7 +49,7 @@ const state = {
   factor: 1,
   weight: undefined as "g" | "oz" | undefined, // Undefined: as the author wrote it
   temp: undefined as "°C" | "°F" | undefined,
-  menu: undefined as "examples" | "share" | "customize" | "scale" | "code" | undefined,
+  menu: undefined as "examples" | "share" | "customize" | "scale" | "code" | "card" | undefined,
 };
 
 // A shared link carries the recipe and the card's style: '#src=…&t=roaster&a=berry'
@@ -524,7 +526,9 @@ function openMenu(menu: typeof state.menu) {
   $("customize-menu").hidden = state.menu !== "customize";
   $("scale-menu").hidden = state.menu !== "scale";
   $("code-menu").hidden = state.menu !== "code";
+  $("card-menu").hidden = state.menu !== "card";
   if (state.menu === "code") renderCode();
+  if (state.menu === "card") renderCard();
   $("scrim").hidden = !state.menu;
   if (state.menu === "share") $("share-url").textContent = link();
 
@@ -646,18 +650,125 @@ $("copy-link").addEventListener("click", async () => {
   toast((await copy(url)) ? "Link copied. Anyone who opens it sees this recipe." : "The link is in the address bar.");
 });
 
-$("download").addEventListener("click", async () => {
-  openMenu(undefined);
-  if (!shown?.model) return toast("Write a recipe first: it starts with a brewer line.");
+// The card as an image: a menu of its own, with a preview, like the code image
 
+let cardLook = cardLookFromParams(storage.get("card"));
+
+/// The card image, its style applied; undefined without a card to show
+function cardImage(): HTMLElement | undefined {
+  if (!shown?.model) return undefined;
+  const image = cardShot(toHtml(shown.model, { signed: cardLook.signed }), cardLook, variables(style)["--brew-accent"]);
+  applyStyle(image.querySelector(".brew-card"), style);
+  return image;
+}
+
+/// The preview: the image itself, scaled down to the menu's width
+function renderCardPreview() {
+  const preview = $("card-preview");
+  const image = cardImage();
+  if (!image) return preview.replaceChildren();
+  preview.replaceChildren(image);
+  preview.classList.toggle("clear", cardLook.background === "none");
+  fitCard(image);
+  const scale = Math.min(1, preview.clientWidth / image.offsetWidth, 360 / image.offsetHeight);
+  image.style.transform = `scale(${scale})`;
+  image.style.marginRight = `${-image.offsetWidth * (1 - scale)}px`; // The layout box shrinks with the picture, so it centers
+  preview.style.height = `${Math.floor(image.offsetHeight * scale)}px`;
+}
+
+/// The menu: the preview and every option
+function renderCard() {
+  renderCardPreview();
+  const setLook = (next: CardLook) => {
+    cardLook = next;
+    storage.set("card", cardLookToParams(cardLook));
+    renderCard();
+  };
+  choices(
+    "card-formats",
+    [["auto", "Fit", cardLook.format === "auto"], ...Object.entries(CARD_FORMATS).map(([key, f]): [string, string, boolean] => [key, f.label, cardLook.format === key])],
+    (value) => setLook({ ...cardLook, format: value as CardLook["format"] }),
+    (button, value) =>
+      (button.title = value === "auto" ? "The card's own size" : `${CARD_FORMATS[value as keyof typeof CARD_FORMATS].width} × ${CARD_FORMATS[value as keyof typeof CARD_FORMATS].height}`),
+  );
+  // The background: the card itself, nothing, the card's accent, a swatch or any color
+  const vars = variables(style);
+  const customBg = cardLook.background.startsWith("#") && !(cardLook.background in BACKGROUNDS) ? cardLook.background : undefined;
+  choices(
+    "card-backgrounds",
+    [
+      ["card", "Card", cardLook.background === "card"],
+      ["none", "Transparent", cardLook.background === "none"],
+      ["accent", "Accent", cardLook.background === "accent"],
+      ...Object.entries(BACKGROUNDS).map(([color, label]): [string, string, boolean] => [color, label, cardLook.background === color]),
+    ],
+    (value) => setLook({ ...cardLook, background: value }),
+    (button, value) =>
+      button.style.setProperty("--swatch", value === "card" ? (vars["--brew-bg"] ?? "var(--card)") : value === "accent" ? (vars["--brew-accent"] ?? "var(--accent)") : value),
+  );
+  $("card-backgrounds").append(
+    colorPicker(
+      customBg,
+      (color) => {
+        cardLook = { ...cardLook, background: color };
+        storage.set("card", cardLookToParams(cardLook));
+        renderCardPreview();
+        for (const button of $("card-backgrounds").querySelectorAll("button")) button.classList.remove("on");
+      },
+      () => renderCard(),
+    ),
+  );
+  choices(
+    "card-fills",
+    [
+      ["gradient", "Gradient", !cardLook.solid],
+      ["solid", "Solid", cardLook.solid],
+    ],
+    (value) => setLook({ ...cardLook, solid: value === "solid" }),
+    (button) => (button.disabled = cardLook.background === "card" || cardLook.background === "none"),
+  );
+  choices("card-shows", [["signed", "Signature", cardLook.signed]], () => setLook({ ...cardLook, signed: !cardLook.signed }));
+}
+
+/// A swatch that opens the color picker, for any background color. Like the accent's picker, 'input' leaves the
+/// menu as it is, so the open picker stays attached; 'change' rebuilds it
+function colorPicker(current: string | undefined, input: (color: string) => void, change: () => void): HTMLLabelElement {
+  const picker = document.createElement("label");
+  picker.className = `swatch-custom${current ? " on" : ""}`;
+  picker.title = "Any color";
+  picker.innerHTML = `<input type="color" aria-label="Any background color" />`;
+  const field = picker.querySelector("input")!;
+  field.value = current ?? "#2a2f3a";
+  if (current) picker.style.setProperty("--swatch", current);
+  field.addEventListener("input", () => {
+    input(field.value);
+    picker.classList.add("on");
+    picker.style.setProperty("--swatch", field.value);
+  });
+  field.addEventListener("change", change);
+  return picker;
+}
+
+$("download").addEventListener("click", () => {
+  if (!shown?.model) {
+    openMenu(undefined);
+    return toast("Write a recipe first: it starts with a brewer line.");
+  }
+  openMenu("card");
+});
+
+$("download-card-png").addEventListener("click", async () => {
+  openMenu(undefined);
+  const image = cardImage();
+  if (!image) return toast("Write a recipe first: it starts with a brewer line.");
   const name = `${state.file.replace(/\.brew$/, "")}.png`;
   const exportBox = $("export");
-  exportBox.innerHTML = toHtml(shown.model, { signed: true });
-  applyStyle(exportBox.firstElementChild, style);
+  exportBox.replaceChildren(image);
   try {
     await document.fonts.ready;
-    await downloadPng(exportBox.firstElementChild as HTMLElement, name, 1080, 1350);
-    toast(`Saved ${name} (1080 × 1350).`);
+    fitCard(image);
+    await downloadSnapshot(image, name, cardRatio(cardLook));
+    toast(`Saved ${name}.`);
   } catch {
     toast("The image could not be made in this browser.");
   } finally {
@@ -705,24 +816,18 @@ function renderCode() {
     (value) => setLook({ ...look, background: value }),
     (button, value) => button.style.setProperty("--swatch", value === "accent" ? accent : value),
   );
-  const bgPicker = document.createElement("label");
-  bgPicker.className = `swatch-custom${customBg ? " on" : ""}`;
-  bgPicker.title = "Any color";
-  bgPicker.innerHTML = `<input type="color" aria-label="Any background color" />`;
-  const bgInput = bgPicker.querySelector("input")!;
-  bgInput.value = customBg ?? "#2a2f3a";
-  if (customBg) bgPicker.style.setProperty("--swatch", customBg);
-  // Like the accent's picker: 'input' leaves the menu as it is, so the open picker stays attached
-  bgInput.addEventListener("input", () => {
-    look = { ...look, background: bgInput.value };
-    storage.set("code", lookToParams(look));
-    renderPreview();
-    for (const button of $("code-backgrounds").querySelectorAll("button")) button.classList.remove("on");
-    bgPicker.classList.add("on");
-    bgPicker.style.setProperty("--swatch", bgInput.value);
-  });
-  bgInput.addEventListener("change", () => renderCode());
-  $("code-backgrounds").append(bgPicker);
+  $("code-backgrounds").append(
+    colorPicker(
+      customBg,
+      (color) => {
+        look = { ...look, background: color };
+        storage.set("code", lookToParams(look));
+        renderPreview();
+        for (const button of $("code-backgrounds").querySelectorAll("button")) button.classList.remove("on");
+      },
+      () => renderCode(),
+    ),
+  );
   choices(
     "code-fills",
     [

@@ -137,8 +137,8 @@
         </button>
         <div class="menu-rule"></div>
         <button type="button" id="download" class="menu-item">
-          <strong>Download image</strong>
-          <span class="muted">A 4:5 PNG of this recipe card, sized for Instagram.</span>
+          <strong>Card image</strong>
+          <span class="muted">A PNG of this recipe card: 4:5 for Instagram, a story, or its own size.</span>
         </button>
         <div class="menu-rule"></div>
         <button type="button" id="download-code" class="menu-item">
@@ -150,6 +150,28 @@
           <strong>Download .brew</strong>
           <span class="muted">The recipe as a text file, to keep, edit or open in any Brewlang tool.</span>
         </button>
+      </div>
+
+      <div id="card-menu" class="menu customize-menu code-menu" hidden>
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Card image</div>
+        <div id="card-preview" class="code-preview" aria-hidden="true"></div>
+        <div class="custom-section">
+          <div class="label">Format</div>
+          <div id="card-formats" class="segmented fill"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Background</div>
+          <div id="card-backgrounds" class="swatches"></div>
+          <div id="card-fills" class="segmented fill"></div>
+        </div>
+        <div class="custom-section">
+          <div class="label">Show</div>
+          <div id="card-shows" class="segmented fill"></div>
+        </div>
+        <div class="custom-actions">
+          <button type="button" id="download-card-png" class="btn-primary">Download PNG</button>
+        </div>
       </div>
 
       <div id="code-menu" class="menu customize-menu code-menu" hidden>
