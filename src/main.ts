@@ -665,7 +665,7 @@ $("download").addEventListener("click", async () => {
   }
 });
 
-// The code as an image, like carbon.now.sh: a menu of its own, with a preview
+// The code as an image: a menu of its own, with a preview
 
 let look = lookFromParams(storage.get("code"));
 const codeFile = () => (state.file.endsWith(".brew") ? state.file : `${state.file}.brew`);

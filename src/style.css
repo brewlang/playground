@@ -1588,7 +1588,7 @@ button {
   }
 }
 
-/* The code image, like carbon.now.sh: the editor's colors in a window, on the card's accent or on nothing */
+/* The code image: the editor's colors in a window, on the card's accent or on nothing */
 
 .snippet {
   --snippet-accent: var(--accent);
