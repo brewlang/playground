@@ -239,8 +239,9 @@ button {
   flex: 1;
 }
 @media (max-width: 1000px) {
-  .brand span {
-    display: none;
+  .brand span,
+  .prompt-more {
+    display: none; /* "Copy prompt" alone, so Docs fits on the top bar */
   }
 }
 
@@ -270,6 +271,9 @@ button {
   border: 0;
   background: transparent;
   color: var(--muted);
+}
+a.btn-ghost:hover {
+  text-decoration: none; /* The Docs link looks like the buttons next to it */
 }
 .btn-ghost:hover {
   background: var(--hover);
