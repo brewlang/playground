@@ -23,7 +23,7 @@ const EXAMPLES = Object.fromEntries(
     import.meta.glob<string>("../../brewlang/examples/*.brew", { query: "?raw", import: "default", eager: true }),
   ).map(([path, source]) => [path.split("/").pop()!, source]),
 );
-const DEFAULT_FILE = "chemex-hoffmann.brew";
+const DEFAULT_FILE = "v60-4-6-basic.brew";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
